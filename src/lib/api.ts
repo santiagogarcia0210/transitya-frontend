@@ -4,11 +4,11 @@ const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://transitya-backend-production.up.railway.app'
 });
 
-const waitForAuth = () => new Promise(resolve => {
+const waitForAuth = () => new Promise<any>(resolve => {
   const { getAuth, onAuthStateChanged } = require('firebase/auth');
   const currentAuth = getAuth();
   if (currentAuth.currentUser) return resolve(currentAuth.currentUser);
-  const unsub = onAuthStateChanged(currentAuth, user => {
+  const unsub = onAuthStateChanged(currentAuth, (user: any) => {
     unsub();
     resolve(user);
   });
