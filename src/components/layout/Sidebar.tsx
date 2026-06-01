@@ -1,35 +1,60 @@
 'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/api';
 
-const links = [
-  { href: '/dashboard',                     label: 'Inicio',                   icon: '🏠' },
-  { href: '/dashboard/registro',            label: 'Registro',                 icon: '👤' },
-  { href: '/dashboard/asistencia',          label: 'Asistencia',               icon: '📋' },
-  { href: '/dashboard/planilla-incluir',    label: 'Planilla Incluir',         icon: '📝' },
-  { href: '/dashboard/dj-esc107',           label: 'DJ — ESC 107',             icon: '📄' },
-  { href: '/dashboard/egresos',             label: 'Egresos',                  icon: '💸' },
-  { href: '/dashboard/ingresos',            label: 'Ingresos',                 icon: '💰' },
-  { href: '/dashboard/remitos',             label: 'Remitos',                  icon: '🧾' },
-  { href: '/dashboard/reportes-km',         label: 'Reportes KM',              icon: '📊' },
-  { href: '/dashboard/facturacion',         label: 'Facturación',              icon: '🗒️' },
-  { href: '/dashboard/vencimientos',        label: 'Vencimientos',             icon: '📅' },
-  { href: '/dashboard/paqueteria',          label: 'Paquetería',               icon: '📦' },
-  { href: '/dashboard/traslado',            label: 'Traslado',                 icon: '🚕' },
-  { href: '/dashboard/presentacion-docs',   label: 'Presentación Docs',        icon: '📁' },
-  { href: '/dashboard/altas-pres',          label: 'Altas (PRES IS)',          icon: '📋' },
-  { href: '/dashboard/cambio-transporte',   label: 'Cambio Transporte',        icon: '🔄' },
-  { href: '/dashboard/choferes-mapa',       label: 'Choferes en vivo',         icon: '🗺️' },
-  { href: '/dashboard/recorridos',          label: 'Recorridos',               icon: '🛣️' },
-  { href: '/dashboard/administrador',       label: 'Administrador',            icon: '⚙️' },
-];
+const MODULOS_POR_TIPO: Record<string, { href: string; label: string }[]> = {
+  transporte_especial: [
+    { href: '/dashboard', label: '🏠 Inicio' },
+    { href: '/dashboard/registro', label: '👤 Registro' },
+    { href: '/dashboard/asistencia', label: '📋 Asistencia' },
+    { href: '/dashboard/planilla-incluir', label: '📝 Planilla Incluir' },
+    { href: '/dashboard/dj-esc107', label: '📄 DJ — ESC 107' },
+    { href: '/dashboard/egresos', label: '💸 Egresos' },
+    { href: '/dashboard/ingresos', label: '💰 Ingresos' },
+    { href: '/dashboard/remitos', label: '🧾 Remitos' },
+    { href: '/dashboard/reportes-km', label: '📊 Reportes KM' },
+    { href: '/dashboard/facturacion', label: '🧾 Facturación' },
+    { href: '/dashboard/presentacion-docs', label: '📁 Presentación Docs' },
+    { href: '/dashboard/altas-pres', label: '📋 Altas (PRES IS)' },
+    { href: '/dashboard/cambio-transporte', label: '🔄 Nota Cambio Transporte' },
+    { href: '/dashboard/vencimientos', label: '📅 Vencimientos' },
+    { href: '/dashboard/choferes-mapa', label: '🚐 Choferes en vivo' },
+    { href: '/dashboard/recorridos', label: '🗺️ Recorridos' },
+    { href: '/dashboard/administrador', label: '⚙️ Administrador' },
+  ],
+  paqueteria: [
+    { href: '/dashboard', label: '🏠 Inicio' },
+    { href: '/dashboard/paqueteria', label: '📦 Paquetería' },
+    { href: '/dashboard/facturacion', label: '🧾 Facturación' },
+    { href: '/dashboard/vencimientos', label: '📅 Vencimientos' },
+    { href: '/dashboard/administrador', label: '⚙️ Administrador' },
+  ],
+  traslado: [
+    { href: '/dashboard', label: '🏠 Inicio' },
+    { href: '/dashboard/traslado', label: '🚕 Traslado' },
+    { href: '/dashboard/facturacion', label: '🧾 Facturación' },
+    { href: '/dashboard/vencimientos', label: '📅 Vencimientos' },
+    { href: '/dashboard/administrador', label: '⚙️ Administrador' },
+  ],
+};
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router   = useRouter();
+  const router = useRouter();
+  const [links, setLinks] = useState(MODULOS_POR_TIPO.transporte_especial);
+
+  useEffect(() => {
+    api.get('/api/empresa/tipo').then(r => {
+      const tipo = r.data?.tipo || r.data;
+      const modulos = MODULOS_POR_TIPO[tipo];
+      if (modulos) setLinks(modulos);
+    }).catch(() => {});
+  }, []);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -42,7 +67,6 @@ export default function Sidebar() {
       background: 'var(--bg2)', borderRight: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column',
     }}>
-      {/* Logo */}
       <div style={{ padding: '1.25rem 1rem .75rem', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
           <span style={{ fontSize: '1.2rem' }}>🚌</span>
@@ -50,7 +74,6 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Nav */}
       <nav style={{ flex: 1, overflowY: 'auto', padding: '.5rem 0' }}>
         {links.map(link => {
           const active = pathname === link.href;
@@ -71,14 +94,12 @@ export default function Sidebar() {
               onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text2)'; (e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg4)'; } }}
               onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text3)'; (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; } }}
             >
-              <span style={{ fontSize: '.9rem', width: '1.1rem', textAlign: 'center' }}>{link.icon}</span>
               {link.label}
             </Link>
           );
         })}
       </nav>
 
-      {/* Logout */}
       <div style={{ padding: '.75rem 1rem', borderTop: '1px solid var(--border)' }}>
         <button
           onClick={handleLogout}
