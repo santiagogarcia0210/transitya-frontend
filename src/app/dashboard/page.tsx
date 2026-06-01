@@ -51,6 +51,8 @@ export default function DashboardPage() {
       const reportesMens  = reportesResp.status === 'fulfilled' ? reportesResp.value.data : null;
       const choferes      = usuariosResp.status === 'fulfilled' ? toArray(usuariosResp.value.data) : [];
 
+      console.log('[DASHBOARD] egresos sample:', JSON.stringify(egresos[0]));
+
       // Filtrar del mes actual
       const mesStr = String(mes).padStart(2, '0');
       const egresosMes = egresos.filter((e: Record<string, string>) => {

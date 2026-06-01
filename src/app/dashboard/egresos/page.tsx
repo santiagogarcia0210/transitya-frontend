@@ -12,6 +12,7 @@ export default function EgresosPage() {
     api.get('/api/egresos').then(r => {
       const datos = toArray(r.data).map(serializarFirestore);
       setLista(datos);
+      console.log('[EGRESOS] first item:', JSON.stringify(datos[0]));
       setTotal(datos.reduce((acc: number, e: any) => acc + (parseFloat(e.monto) || 0), 0));
       setLoading(false);
     });
