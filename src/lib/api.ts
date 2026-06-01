@@ -1,15 +1,22 @@
 import axios from 'axios';
-import { auth } from './firebase';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://transitya-backend-production.up.railway.app'
 });
 
+const waitForAuth = () => new Promise(resolve => {
+  const { getAuth, onAuthStateChanged } = require('firebase/auth');
+  const currentAuth = getAuth();
+  if (currentAuth.currentUser) return resolve(currentAuth.currentUser);
+  const unsub = onAuthStateChanged(currentAuth, user => {
+    unsub();
+    resolve(user);
+  });
+});
+
 api.interceptors.request.use(async (config) => {
   try {
-    const { getAuth } = await import('firebase/auth');
-    const currentAuth = getAuth();
-    const user = currentAuth.currentUser;
+    const user = await waitForAuth();
     if (user) {
       const token = await user.getIdToken(true);
       config.headers.Authorization = `Bearer ${token}`;
