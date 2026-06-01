@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 
 export default function RemitosPage() {
   const [lista, setLista] = useState<any[]>([]);
@@ -9,7 +9,7 @@ export default function RemitosPage() {
 
   useEffect(() => {
     api.get('/api/remitos').then(r => {
-      setLista(r.data.map(serializarFirestore));
+      setLista(toArray(r.data).map(serializarFirestore));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import { toArray } from '@/lib/utils';
 import dynamic from 'next/dynamic';
 
 const MapaChoferes = dynamic(() => import('@/components/MapaChoferes'), { ssr: false });
@@ -9,7 +10,7 @@ export default function ChoferesMapaPage() {
   const [ubicaciones, setUbicaciones] = useState<any[]>([]);
 
   const cargar = () => {
-    api.get('/api/ubicaciones').then(r => setUbicaciones(r.data));
+    api.get('/api/ubicaciones').then(r => setUbicaciones(toArray(r.data)));
   };
 
   useEffect(() => {

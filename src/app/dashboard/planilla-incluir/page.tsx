@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import { toArray } from '@/lib/utils';
 
 interface Beneficiario {
   id: string;
@@ -42,8 +43,8 @@ export default function PlanillaIncluirPage() {
         api.get('/api/beneficiarios'),
         api.get('/api/asistencia'),
       ]);
-      const bs: Beneficiario[] = bResp.data || [];
-      const as: AsistenciaReg[] = aResp.data || [];
+      const bs: Beneficiario[] = toArray(bResp.data);
+      const as: AsistenciaReg[] = toArray(aResp.data);
 
       // Filtrar asistencia del mes seleccionado
       const mesStr = String(mes).padStart(2, '0');

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 
 function calcularEstado(fechaStr: string): 'VENCIDO' | 'PROXIMO' | 'VIGENTE' {
   if (!fechaStr) return 'VIGENTE';
@@ -26,7 +26,7 @@ export default function VencimientosPage() {
 
   useEffect(() => {
     api.get('/api/vencimientos').then(r => {
-      setLista(r.data.map(serializarFirestore));
+      setLista(toArray(r.data).map(serializarFirestore));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);

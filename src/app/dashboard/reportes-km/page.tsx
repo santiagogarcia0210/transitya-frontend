@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 
 export default function ReportesKMPage() {
   const [lista, setLista] = useState<any[]>([]);
@@ -10,7 +10,7 @@ export default function ReportesKMPage() {
 
   useEffect(() => {
     api.get('/api/reportes').then(r => {
-      const data = r.data.map(serializarFirestore);
+      const data = toArray(r.data).map(serializarFirestore);
       setLista(data);
       setTotalKM(data.reduce((acc: number, e: any) => acc + (parseFloat(e.kmRecorridos || e['KM RECORRIDOS'] || e.km || 0)), 0));
       setLoading(false);

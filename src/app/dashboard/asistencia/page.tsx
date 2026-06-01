@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 
 export default function AsistenciaPage() {
   const [lista, setLista] = useState<any[]>([]);
@@ -11,7 +11,7 @@ export default function AsistenciaPage() {
   const cargar = () => {
     setLoading(true);
     api.get(`/api/asistencia?fecha=${fecha}`).then(r => {
-      setLista(r.data.map(serializarFirestore));
+      setLista(toArray(r.data).map(serializarFirestore));
       setLoading(false);
     });
   };

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import { toArray } from '@/lib/utils';
 
 interface Tablero {
   beneficiariosActivos: number;
@@ -44,11 +45,11 @@ export default function DashboardPage() {
         api.get('/api/vencimientos'),
       ]);
 
-      const beneficiarios = benefResp.status === 'fulfilled' ? (benefResp.value.data || []) : [];
-      const egresos       = egresosResp.status === 'fulfilled' ? (egresosResp.value.data || []) : [];
-      const ingresos      = ingresosResp.status === 'fulfilled' ? (ingresosResp.value.data || []) : [];
+      const beneficiarios = benefResp.status === 'fulfilled' ? toArray(benefResp.value.data) : [];
+      const egresos       = egresosResp.status === 'fulfilled' ? toArray(egresosResp.value.data) : [];
+      const ingresos      = ingresosResp.status === 'fulfilled' ? toArray(ingresosResp.value.data) : [];
       const reportesMens  = reportesResp.status === 'fulfilled' ? reportesResp.value.data : null;
-      const choferes      = usuariosResp.status === 'fulfilled' ? (usuariosResp.value.data || []) : [];
+      const choferes      = usuariosResp.status === 'fulfilled' ? toArray(usuariosResp.value.data) : [];
 
       // Filtrar del mes actual
       const mesStr = String(mes).padStart(2, '0');

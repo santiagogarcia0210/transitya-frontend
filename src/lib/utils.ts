@@ -1,3 +1,10 @@
+// Normaliza respuestas de la API a un array. El backend a veces devuelve
+// un array directo y otras veces lo envuelve en { items } o { data }.
+export function toArray(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  return data?.items || data?.data || [];
+}
+
 export function serializarFirestore(obj: any): any {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj !== 'object') return obj;

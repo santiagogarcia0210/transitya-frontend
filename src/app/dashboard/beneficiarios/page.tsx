@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 
 const normalizar = (b: any) => ({
   ...b,
@@ -17,7 +17,7 @@ export default function BeneficiariosPage() {
 
   useEffect(() => {
     api.get('/api/beneficiarios').then(r => {
-      setLista(r.data.map(serializarFirestore).map(normalizar));
+      setLista(toArray(r.data).map(serializarFirestore).map(normalizar));
       setLoading(false);
     });
   }, []);

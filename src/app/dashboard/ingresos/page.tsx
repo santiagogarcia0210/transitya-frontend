@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 
 export default function IngresosPage() {
   const [lista, setLista] = useState<any[]>([]);
@@ -10,7 +10,7 @@ export default function IngresosPage() {
 
   useEffect(() => {
     api.get('/api/ingresos').then(r => {
-      const data = r.data.map(serializarFirestore);
+      const data = toArray(r.data).map(serializarFirestore);
       setLista(data);
       setTotal(data.reduce((acc: number, e: any) => acc + (parseFloat(e.monto || e.MONTO || 0)), 0));
       setLoading(false);

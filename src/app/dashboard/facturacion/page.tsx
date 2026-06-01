@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 
 export default function FacturacionPage() {
   const [facturas, setFacturas] = useState<any[]>([]);
@@ -9,7 +9,7 @@ export default function FacturacionPage() {
 
   useEffect(() => {
     api.get('/api/facturacion/facturas').then(r => {
-      setFacturas(r.data.map(serializarFirestore));
+      setFacturas(toArray(r.data).map(serializarFirestore));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);

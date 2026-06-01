@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 import dynamic from 'next/dynamic';
 
 const MapaRecorrido = dynamic(() => import('@/components/MapaRecorrido'), { ssr: false });
@@ -19,7 +19,7 @@ export default function RecorridosPage() {
 
   useEffect(() => {
     api.get('/api/beneficiarios').then(r => {
-      const conGPS = r.data
+      const conGPS = toArray(r.data)
         .map(serializarFirestore)
         .filter((b: any) => b.lat && b.lng && parseFloat(b.lat) !== 0 && parseFloat(b.lng) !== 0)
         .map(normalizar);

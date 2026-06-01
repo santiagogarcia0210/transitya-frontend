@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 
 export default function ChoferesPage() {
   const [lista, setLista] = useState<any[]>([]);
@@ -10,7 +10,7 @@ export default function ChoferesPage() {
   useEffect(() => {
     api.get('/api/usuarios').then(r => {
       setLista(
-        r.data.map(serializarFirestore).filter((u: any) => u.rol?.toLowerCase() === 'chofer')
+        toArray(r.data).map(serializarFirestore).filter((u: any) => u.rol?.toLowerCase() === 'chofer')
       );
       setLoading(false);
     });

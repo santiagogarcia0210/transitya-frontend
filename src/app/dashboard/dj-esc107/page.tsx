@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
+import { toArray } from '@/lib/utils';
 
 interface Beneficiario {
   id: string;
@@ -31,7 +32,7 @@ export default function DJEsc107Page() {
     setLoading(true);
     try {
       const r = await api.get('/api/beneficiarios');
-      setBeneficiarios(r.data || []);
+      setBeneficiarios(toArray(r.data));
     } finally {
       setLoading(false);
     }

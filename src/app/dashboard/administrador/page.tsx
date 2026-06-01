@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 
 type Tab = 'usuarios' | 'fiscal';
 
@@ -13,7 +13,7 @@ export default function AdministradorPage() {
 
   useEffect(() => {
     api.get('/api/usuarios').then(r => {
-      setUsuarios(r.data.map(serializarFirestore));
+      setUsuarios(toArray(r.data).map(serializarFirestore));
       setLoading(false);
     }).catch(() => setLoading(false));
 

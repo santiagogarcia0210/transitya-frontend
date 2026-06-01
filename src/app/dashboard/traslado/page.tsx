@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 
 type Tab = 'viajes' | 'pasajeros' | 'choferes';
 
@@ -14,7 +14,7 @@ export default function TrasladoPage() {
     const tabs: Tab[] = ['viajes', 'pasajeros', 'choferes'];
     tabs.forEach(t => {
       api.get(`/api/traslado/${t}`).then(r => {
-        setDatos(prev => ({ ...prev, [t]: r.data.map(serializarFirestore) }));
+        setDatos(prev => ({ ...prev, [t]: toArray(r.data).map(serializarFirestore) }));
         setLoading(prev => ({ ...prev, [t]: false }));
       }).catch(() => setLoading(prev => ({ ...prev, [t]: false })));
     });

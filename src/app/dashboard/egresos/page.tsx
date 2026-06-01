@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { serializarFirestore } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
 
 export default function EgresosPage() {
   const [lista, setLista] = useState<any[]>([]);
@@ -10,7 +10,7 @@ export default function EgresosPage() {
 
   useEffect(() => {
     api.get('/api/egresos').then(r => {
-      const datos = r.data.map(serializarFirestore);
+      const datos = toArray(r.data).map(serializarFirestore);
       setLista(datos);
       setTotal(datos.reduce((acc: number, e: any) => acc + (parseFloat(e.monto) || 0), 0));
       setLoading(false);
