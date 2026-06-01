@@ -1,31 +1,33 @@
 import axios from 'axios';
+import { getAuth, type User } from 'firebase/auth';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://transitya-backend-production.up.railway.app'
 });
 
-const waitForAuth = () => new Promise<any>(resolve => {
-  const { getAuth, onAuthStateChanged } = require('firebase/auth');
-  const currentAuth = getAuth();
-  if (currentAuth.currentUser) return resolve(currentAuth.currentUser);
-  const unsub = onAuthStateChanged(currentAuth, (user: any) => {
-    unsub();
-    resolve(user);
-  });
-});
-
 api.interceptors.request.use(async (config) => {
   try {
-    const user = await waitForAuth();
+    const auth = getAuth();
+    const user = auth.currentUser;
     if (user) {
-      const token = await user.getIdToken(true);
+      const token = await user.getIdToken();
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('[API] Token attached, user:', user.email);
     } else {
-      console.log('[API] No current user');
+      // Wait for auth state
+      await new Promise<void>((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged(() => {
+          unsubscribe();
+          resolve();
+        });
+      });
+      const freshUser = auth.currentUser as User | null;
+      if (freshUser) {
+        const token = await freshUser.getIdToken();
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
-  } catch(e) {
-    console.error('[API] Token error:', e);
+  } catch (e) {
+    console.error('[API] interceptor error:', e);
   }
   return config;
 });
