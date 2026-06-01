@@ -2,9 +2,11 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  apiKey: 'AIzaSyBuqkcta6tj5i9KDDRvxss5NSgX3ctnO0c',
   authDomain: 'gestion-transporte-ef756.firebaseapp.com',
   projectId: 'gestion-transporte-ef756',
+  storageBucket: 'gestion-transporte-ef756.firebasestorage.app',
+  messagingSenderId: '894144256196',
   appId: '1:894144256196:web:86185acf9b5d1ae7cd5191'
 };
 
