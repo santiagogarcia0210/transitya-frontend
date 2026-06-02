@@ -3,134 +3,308 @@ import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 
-const INPUT = 'w-full bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500 text-sm';
-const EMPTY = { fecha: '', nroFactura: '', concepto: '', monto: '', obraSocial: '', estado: 'PRESENTADO' };
+const ESTADOS = ['PRESENTADO', 'PAGADO'];
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+interface Ingreso {
+  id: string; fecha: string; nroFactura: string; concepto: string;
+  monto: number; obraSocial: string; estado: string; observaciones: string;
+}
+
+interface FormState {
+  id: string; fecha: string; nroFactura: string; concepto: string;
+  monto: string; obraSocial: string; estado: string; observaciones: string;
+}
+
+const EMPTY: FormState = {
+  id: '', fecha: '', nroFactura: '', concepto: '',
+  monto: '', obraSocial: '', estado: 'PRESENTADO', observaciones: '',
+};
+
+function normalizar(e: Record<string, unknown>): Ingreso {
+  return {
+    id:           String(e.id           || ''),
+    fecha:        String(e.fecha        || e.FECHA        || ''),
+    nroFactura:   String(e.nroFactura   || e.NROFACTURA   || e['NRO FACTURA'] || e.nro_factura || ''),
+    concepto:     String(e.concepto     || e.CONCEPTO     || e.descripcion    || ''),
+    monto:        Number(e.monto        || e.MONTO        || 0),
+    obraSocial:   String(e.obraSocial   || e.OBRASOCIAL   || e['OBRA SOCIAL'] || ''),
+    estado:       String(e.estado       || e.ESTADO       || 'PRESENTADO').toUpperCase(),
+    observaciones:String(e.observaciones|| e.OBSERVACIONES|| ''),
+  };
+}
+
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: '.78rem', color: 'var(--text3)', marginBottom: '.3rem', fontWeight: 500,
+};
+
+const fmt = (n: number) =>
+  n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+
+function badgeEstado(estado: string) {
+  return estado === 'PAGADO' ? 'badge-green' : 'badge-amber';
+}
 
 export default function IngresosPage() {
-  const [lista, setLista] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(EMPTY);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [lista,         setLista]         = useState<Ingreso[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [filtroBusq,    setFiltroBusq]    = useState('');
+  const [filtroEstado,  setFiltroEstado]  = useState('');
+  const [filtroMes,     setFiltroMes]     = useState('');
+  const [showModal,     setShowModal]     = useState(false);
+  const [form,          setForm]          = useState<FormState>(EMPTY);
+  const [saving,        setSaving]        = useState(false);
+  const [pagando,       setPagando]       = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [msg,           setMsg]           = useState<{ text: string; ok: boolean } | null>(null);
 
-  const cargar = () => {
-    api.get('/api/ingresos').then(r => {
-      const data = toArray(r.data).map(serializarFirestore);
-      setLista(data);
-      setTotal(data.reduce((acc: number, e: any) => acc + (parseFloat(e.monto || e.MONTO || 0)), 0));
-      setLoading(false);
-    }).catch(() => setLoading(false));
+  const hoy = new Date();
+  const anioActual = hoy.getFullYear();
+
+  const cargar = async () => {
+    setLoading(true);
+    try {
+      const r = await api.get('/api/ingresos');
+      setLista(toArray(r.data).map(serializarFirestore).map(normalizar));
+    } catch { /* silent */ }
+    setLoading(false);
   };
 
   useEffect(() => { cargar(); }, []);
 
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm(f => ({ ...f, [k]: e.target.value }));
+  const filtrados = lista.filter(e => {
+    const q = filtroBusq.toLowerCase();
+    if (q && !e.concepto.toLowerCase().includes(q) && !e.obraSocial.toLowerCase().includes(q) && !e.nroFactura.toLowerCase().includes(q)) return false;
+    if (filtroEstado && e.estado !== filtroEstado) return false;
+    if (filtroMes) {
+      const [mes, anio] = filtroMes.split('-');
+      if (!e.fecha.includes(`/${mes}/${anio}`) && !e.fecha.startsWith(`${anio}-${mes}`)) return false;
+    }
+    return true;
+  });
 
-  const handleSubmit = async () => {
-    setSaving(true); setMsg('');
+  const totalFiltrado  = filtrados.reduce((s, e) => s + e.monto, 0);
+  const totalPagado    = filtrados.filter(e => e.estado === 'PAGADO').reduce((s, e) => s + e.monto, 0);
+  const totalPresentado = filtrados.filter(e => e.estado === 'PRESENTADO').reduce((s, e) => s + e.monto, 0);
+
+  const setF = (k: keyof FormState) =>
+    (ev: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      setForm(f => ({ ...f, [k]: ev.target.value }));
+
+  const abrirNuevo = () => {
+    setForm(EMPTY); setMsg(null); setShowModal(true);
+  };
+
+  const abrirEdicion = (e: Ingreso) => {
+    setForm({ id: e.id, fecha: e.fecha, nroFactura: e.nroFactura, concepto: e.concepto,
+      monto: String(e.monto), obraSocial: e.obraSocial, estado: e.estado, observaciones: e.observaciones });
+    setMsg(null); setShowModal(true);
+  };
+
+  const cerrarModal = () => { setShowModal(false); setMsg(null); };
+
+  const guardar = async () => {
+    if (!form.fecha || !form.concepto || !form.monto) {
+      setMsg({ text: 'Completá fecha, concepto y monto', ok: false });
+      return;
+    }
+    setSaving(true); setMsg(null);
     try {
-      await api.post('/api/ingresos', form);
-      setMsg('Ingreso guardado');
-      setShowForm(false);
-      setForm(EMPTY);
+      if (form.id) {
+        await api.put(`/api/ingresos/${form.id}`, form);
+      } else {
+        await api.post('/api/ingresos', form);
+      }
+      cerrarModal();
       cargar();
-    } catch { setMsg('Error al guardar'); }
+    } catch { setMsg({ text: 'Error al guardar', ok: false }); }
     setSaving(false);
   };
 
-  const marcarCobrado = async (id: string) => {
+  const marcarPagado = async (id: string, ev: React.MouseEvent) => {
+    ev.stopPropagation();
+    setPagando(id);
     try {
-      await api.patch(`/api/ingresos/${id}`, { estado: 'COBRADO' });
+      await api.patch(`/api/ingresos/${id}/pagar`);
       cargar();
-    } catch { alert('Error al actualizar'); }
+    } catch { /* silent */ }
+    setPagando(null);
   };
 
-  const estadoBadge = (estado: string) =>
-    estado.toUpperCase() === 'COBRADO' ? 'bg-green-900 text-green-400' : 'bg-yellow-900 text-yellow-400';
+  const eliminar = async (id: string) => {
+    try { await api.delete(`/api/ingresos/${id}`); setConfirmDelete(null); cargar(); }
+    catch { /* silent */ }
+  };
+
+  const mesesFiltro = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(anioActual, hoy.getMonth() - i, 1);
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const a = d.getFullYear();
+    return { value: `${m}-${a}`, label: `${MESES[d.getMonth()]} ${a}` };
+  });
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-2xl font-bold text-white">Ingresos</h2>
-        <button onClick={() => { setShowForm(true); setMsg(''); }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
-          + Nuevo ingreso
-        </button>
+      {/* Header */}
+      <div className="section-header">
+        <div>
+          <h2 className="section-title">💰 Ingresos</h2>
+          <p style={{ fontSize: '.82rem', color: 'var(--text3)', marginTop: '.2rem' }}>
+            {filtrados.length} registro{filtrados.length !== 1 ? 's' : ''} ·{' '}
+            <strong style={{ color: 'var(--green)' }}>{fmt(totalFiltrado)}</strong>
+          </p>
+        </div>
+        <button className="btn btn-primary" onClick={abrirNuevo}>+ Nuevo ingreso</button>
       </div>
-      <p className="text-green-400 text-3xl font-bold mb-6">$ {total.toLocaleString('es-AR')}</p>
 
-      {loading ? <p className="text-gray-400">Cargando...</p> : (
-        <div className="space-y-2">
-          {lista.map((e, i) => {
-            const estado = (e.estado || e.ESTADO || 'PRESENTADO').toUpperCase();
-            return (
-              <div key={e.id || i} className="bg-gray-900 rounded-xl p-4 flex justify-between items-center">
-                <div>
-                  <p className="text-white font-medium">{e.concepto || e.CONCEPTO || e.descripcion || 'Sin concepto'}</p>
-                  <p className="text-gray-400 text-sm">
-                    {e.fecha || e.FECHA} · {e.obraSocial || e['OBRA SOCIAL'] || ''} · Fact. {e.nroFactura || e['NRO FACTURA'] || ''}
-                  </p>
+      {/* KPIs rápidos */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem', marginBottom: '1rem' }}>
+        <div className="card" style={{ padding: '.85rem 1rem' }}>
+          <p style={{ fontSize: '.75rem', color: 'var(--text3)' }}>Cobrado</p>
+          <p style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--green)' }}>{fmt(totalPagado)}</p>
+        </div>
+        <div className="card" style={{ padding: '.85rem 1rem' }}>
+          <p style={{ fontSize: '.75rem', color: 'var(--text3)' }}>Pendiente</p>
+          <p style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--amber)' }}>{fmt(totalPresentado)}</p>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="filter-bar">
+        <input className="input" placeholder="Buscar concepto, obra social, factura…"
+          value={filtroBusq} onChange={e => setFiltroBusq(e.target.value)} />
+        <select className="select" value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)}>
+          <option value="">Todos los estados</option>
+          {ESTADOS.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select className="select" value={filtroMes} onChange={e => setFiltroMes(e.target.value)}>
+          <option value="">Todos los meses</option>
+          {mesesFiltro.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+        {(filtroBusq || filtroEstado || filtroMes) && (
+          <button className="btn btn-secondary" style={{ fontSize: '.78rem' }}
+            onClick={() => { setFiltroBusq(''); setFiltroEstado(''); setFiltroMes(''); }}>
+            ✕ Limpiar
+          </button>
+        )}
+      </div>
+
+      {/* Lista */}
+      {loading ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', color: 'var(--text3)', padding: '2rem 0' }}>
+          <span className="spinner" /> Cargando ingresos…
+        </div>
+      ) : filtrados.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-icon">💰</div>
+          <p>Sin ingresos registrados</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+          {filtrados.map(e => (
+            <div key={e.id} className="card"
+              style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.75rem 1rem', cursor: 'pointer' }}
+              onClick={() => abrirEdicion(e)}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '.88rem', fontWeight: 600, color: 'var(--text)' }}>{e.concepto}</span>
+                  <span className={`badge ${badgeEstado(e.estado)}`}>{e.estado}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <p className="text-green-400 font-bold">$ {parseFloat(e.monto || e.MONTO || 0).toLocaleString('es-AR')}</p>
-                  <span className={`text-xs px-2 py-1 rounded-full ${estadoBadge(estado)}`}>{estado}</span>
-                  {estado !== 'COBRADO' && e.id && (
-                    <button onClick={() => marcarCobrado(e.id)}
-                      className="text-xs px-2 py-1 bg-blue-900 text-blue-400 rounded-full hover:bg-blue-800">
-                      Marcar cobrado
-                    </button>
-                  )}
-                </div>
+                <p style={{ fontSize: '.78rem', color: 'var(--text3)', marginTop: '.15rem' }}>
+                  {e.fecha}
+                  {e.obraSocial && ` · ${e.obraSocial}`}
+                  {e.nroFactura && ` · Fact. ${e.nroFactura}`}
+                </p>
               </div>
-            );
-          })}
-          {lista.length === 0 && <p className="text-gray-400">Sin registros.</p>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                <p style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--green)', whiteSpace: 'nowrap' }}>
+                  {fmt(e.monto)}
+                </p>
+                {e.estado !== 'PAGADO' && e.id && (
+                  <button className="btn btn-success" style={{ fontSize: '.72rem', padding: '.3rem .6rem', whiteSpace: 'nowrap' }}
+                    disabled={pagando === e.id}
+                    onClick={ev => marcarPagado(e.id, ev)}>
+                    {pagando === e.id ? '…' : '✓ Cobrado'}
+                  </button>
+                )}
+                {confirmDelete === e.id ? (
+                  <div style={{ display: 'flex', gap: '.4rem' }} onClick={ev => ev.stopPropagation()}>
+                    <button className="btn btn-danger" style={{ fontSize: '.72rem', padding: '.3rem .6rem' }}
+                      onClick={() => eliminar(e.id)}>Confirmar</button>
+                    <button className="btn btn-secondary" style={{ fontSize: '.72rem', padding: '.3rem .6rem' }}
+                      onClick={() => setConfirmDelete(null)}>Cancelar</button>
+                  </div>
+                ) : (
+                  <button className="btn btn-secondary" style={{ fontSize: '.72rem', padding: '.3rem .6rem' }}
+                    onClick={ev => { ev.stopPropagation(); setConfirmDelete(e.id); }}>🗑</button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold text-white mb-4">Nuevo ingreso</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-gray-400 text-xs mb-1 block">Fecha</label>
-                <input type="date" value={form.fecha} onChange={set('fecha')} className={INPUT} />
+      {/* Modal */}
+      {showModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}
+          onClick={e => { if (e.target === e.currentTarget) cerrarModal(); }}>
+          <div className="card" style={{ width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: '1.25rem' }}>
+              {form.id ? '✏️ Editar ingreso' : '+ Nuevo ingreso'}
+            </h3>
+
+            <div className="form-grid">
+              <div className="form-grid form-grid-2">
+                <div>
+                  <label style={labelStyle}>Fecha *</label>
+                  <input type="date" className="input" value={form.fecha} onChange={setF('fecha')} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Monto *</label>
+                  <input type="number" className="input" placeholder="0" value={form.monto} onChange={setF('monto')} />
+                </div>
               </div>
               <div>
-                <label className="text-gray-400 text-xs mb-1 block">N° Factura</label>
-                <input type="text" value={form.nroFactura} onChange={set('nroFactura')} className={INPUT} />
+                <label style={labelStyle}>Concepto *</label>
+                <input type="text" className="input" placeholder="Ej: Liquidación mayo" value={form.concepto} onChange={setF('concepto')} />
+              </div>
+              <div className="form-grid form-grid-2">
+                <div>
+                  <label style={labelStyle}>N° Factura</label>
+                  <input type="text" className="input" placeholder="0001-00000001" value={form.nroFactura} onChange={setF('nroFactura')} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Estado</label>
+                  <select className="select" value={form.estado} onChange={setF('estado')}>
+                    {ESTADOS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
               <div>
-                <label className="text-gray-400 text-xs mb-1 block">Concepto</label>
-                <input type="text" value={form.concepto} onChange={set('concepto')} className={INPUT} />
+                <label style={labelStyle}>Obra Social</label>
+                <input type="text" className="input" placeholder="Ej: IOMA" value={form.obraSocial} onChange={setF('obraSocial')} />
               </div>
               <div>
-                <label className="text-gray-400 text-xs mb-1 block">Monto</label>
-                <input type="number" value={form.monto} onChange={set('monto')} className={INPUT} />
-              </div>
-              <div>
-                <label className="text-gray-400 text-xs mb-1 block">Obra Social</label>
-                <input type="text" value={form.obraSocial} onChange={set('obraSocial')} className={INPUT} />
-              </div>
-              <div>
-                <label className="text-gray-400 text-xs mb-1 block">Estado</label>
-                <select value={form.estado} onChange={set('estado')} className={INPUT}>
-                  <option value="PRESENTADO">PRESENTADO</option>
-                  <option value="COBRADO">COBRADO</option>
-                </select>
+                <label style={labelStyle}>Observaciones</label>
+                <textarea className="textarea" rows={2} placeholder="Opcional…"
+                  value={form.observaciones} onChange={setF('observaciones')} />
               </div>
             </div>
-            {msg && <p className={`text-sm mt-3 ${msg.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>{msg}</p>}
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setShowForm(false)}
-                className="flex-1 bg-gray-800 text-gray-400 py-2 rounded-lg text-sm">Cancelar</button>
-              <button onClick={handleSubmit} disabled={saving}
-                className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm disabled:opacity-50">
-                {saving ? 'Guardando...' : 'Guardar'}
+
+            {msg && (
+              <p style={{ fontSize: '.82rem', color: msg.ok ? 'var(--green)' : 'var(--red)', marginTop: '.75rem' }}>
+                {msg.text}
+              </p>
+            )}
+
+            <div style={{ display: 'flex', gap: '.75rem', marginTop: '1.25rem' }}>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={cerrarModal}>Cancelar</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={guardar} disabled={saving}>
+                {saving
+                  ? <><span className="spinner" style={{ width: '12px', height: '12px', borderWidth: '2px' }} /> Guardando…</>
+                  : form.id ? 'Actualizar' : 'Guardar'}
               </button>
             </div>
           </div>

@@ -1,191 +1,162 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { serializarFirestore, toArray } from '@/lib/utils';
+import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
 
-interface Registro {
-  id: string;
-  [key: string]: unknown;
+interface Beneficiario {
+  id: string; nombre: string; nroAfiliado: string;
 }
 
-const CAMPOS_DEFAULT = [
-  'APELLIDO Y NOMBRE', 'DNI', 'N° AFILIADO', 'OBRA SOCIAL',
-  'FECHA ALTA', 'CHOFER', 'DOMICILIO', 'LOCALIDAD', 'TIPO PRES', 'ESTADO', 'OBSERVACIONES'
-];
+function norm(b: Record<string,unknown>): Beneficiario {
+  return {
+    id:          String(b.id          || ''),
+    nombre:      String(b.nombre      || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
+    nroAfiliado: String(b.nroAfiliado || b['N° AFILIADO']      || b.nroAfiliado || ''),
+  };
+}
+
+const printCSS = `
+@media print {
+  .no-print { display: none !important; }
+  .carta-page { page-break-after: always; }
+  .carta-page:last-child { page-break-after: auto; }
+  @page { size: A4 portrait; margin: 2cm; }
+}
+`;
+
+function CartaAlta({ b }: { b: Beneficiario }) {
+  return (
+    <div className="carta-page" style={{ fontFamily:'Arial, sans-serif', color:'#000', background:'#fff',
+      padding:'1.5cm', marginBottom:'2rem', border:'1px solid #ddd', fontSize:'10pt' }}>
+      {/* Header */}
+      <div style={{ borderBottom:'2pt solid #000', paddingBottom:'8pt', marginBottom:'16pt', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div>
+          <div style={{ fontWeight:900, fontSize:'12pt' }}>Servicio de Traslados Programados</div>
+          <div style={{ fontSize:'9pt', color:'#555' }}>Incluir Salud — Transporte Especial</div>
+        </div>
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontWeight:900, fontSize:'14pt', letterSpacing:'1px' }}>INSCRIPCIÓN DE DOCUMENTACION</div>
+        </div>
+      </div>
+
+      {/* Fecha */}
+      <div style={{ textAlign:'right', marginBottom:'16pt' }}>
+        FECHA: <span style={{ display:'inline-block', minWidth:120, borderBottom:'1pt solid #000' }}>&nbsp;</span>
+      </div>
+
+      {/* Destinatario */}
+      <div style={{ marginBottom:'12pt' }}>
+        <strong>A las autoridades de: Incluir Salud</strong>
+      </div>
+
+      <p style={{ marginBottom:'12pt' }}>
+        Por la presente se hace entrega de la documentación necesaria para la tramitación del servicio de transporte:
+      </p>
+
+      {/* Lista de documentos */}
+      <ul style={{ paddingLeft:'1.5rem', marginBottom:'16pt', lineHeight:'1.8' }}>
+        {[
+          'Receta prescripta por el médico del centro de tratamiento',
+          'Módulo de Incapacidades Permanentes (PIM)',
+          'Informe clínico de Discapacidad (CUD)',
+          'Documento Nacional de Identidad (DNI)',
+          'Boleta de servicio (agua/luz) con domicilio de residencia',
+          'Poder notarial (para agentes de terceros o de más de 18 años)',
+          'Prueba escrita de solicitud de cambio de transportista',
+          'Solicitud escrita',
+          'Atención social',
+          'Constancia de obra (Preferencia Económica)',
+          'Foto de vida',
+        ].map(doc => <li key={doc} style={{ marginBottom:'2pt' }}>{doc}</li>)}
+      </ul>
+
+      <p style={{ marginBottom:'16pt' }}>
+        Dicha documentación es presentada por el beneficiario o su representante legal, para dar inicio
+        o continuidad al trámite correspondiente ante el Programa Incluir Salud.
+      </p>
+
+      {/* Datos del beneficiario */}
+      <div style={{ border:'1pt solid #000', padding:'8pt', marginBottom:'16pt' }}>
+        <div style={{ fontWeight:700, marginBottom:'6pt' }}>Datos del beneficiario:</div>
+        <div style={{ display:'grid', gap:'6pt' }}>
+          <div style={{ display:'flex', gap:'8pt' }}>
+            <strong style={{ minWidth:160 }}>Apellido y nombre:</strong>
+            <span style={{ flex:1, borderBottom:'1pt solid #000' }}>{b.nombre || '___________________________________'}</span>
+          </div>
+          <div style={{ display:'flex', gap:'8pt' }}>
+            <strong style={{ minWidth:160 }}>N° del beneficiario:</strong>
+            <span style={{ flex:1, borderBottom:'1pt solid #000' }}>{b.nroAfiliado || '___________________________________'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Firmas */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'2rem', marginTop:'2rem' }}>
+        <div>
+          <div style={{ borderTop:'1pt solid #000', paddingTop:'4pt', marginTop:'40pt', textAlign:'center', fontSize:'9pt' }}>
+            Firma y aclaración de quien recibe
+          </div>
+        </div>
+        <div>
+          <div style={{ borderTop:'1pt solid #000', paddingTop:'4pt', marginTop:'40pt', textAlign:'center', fontSize:'9pt' }}>
+            Fecha de recepción: ___/___/______
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AltasPresPage() {
-  const [registros, setRegistros] = useState<Registro[]>([]);
-  const [headers,   setHeaders]   = useState<string[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [busqueda,  setBusqueda]  = useState('');
-  const [modal,     setModal]     = useState(false);
-  const [form,      setForm]      = useState<Record<string, string>>({});
-  const [guardando, setGuardando] = useState(false);
-  const [msg,       setMsg]       = useState('');
+  const router = useRouter();
+  const { tipo, loading: tipoLoading } = useEmpresaTipo();
 
-  useEffect(() => { cargarDatos(); }, []);
+  const [lista,   setLista]   = useState<Beneficiario[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const cargarDatos = async () => {
+  useEffect(() => {
+    if (!tipoLoading && tipo !== null && tipo !== 'transporte_escolar') router.replace('/dashboard');
+  }, [tipo, tipoLoading, router]);
+
+  const cargar = async () => {
     setLoading(true);
     try {
-      const r = await api.get('/api/facturacion/datos/altas');
-      setRegistros(r.data.registros || []);
-      setHeaders(r.data.headers || []);
-    } catch {
-      setMsg('Error al cargar datos');
-    } finally {
-      setLoading(false);
-    }
+      const r = await api.get('/api/altas-pres');
+      setLista(toArray(r.data).map(serializarFirestore).map(norm));
+    } catch { /* silent */ }
+    setLoading(false);
   };
 
-  const camposActivos = headers.length > 0 ? headers.slice(0, 11) : CAMPOS_DEFAULT;
+  useEffect(() => { if (tipo === 'transporte_escolar') cargar(); }, [tipo]);
 
-  const filtrados = busqueda
-    ? registros.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(busqueda.toLowerCase())))
-    : registros;
-
-  const abrirModal = () => {
-    const f: Record<string, string> = {};
-    camposActivos.forEach(h => { f[h] = ''; });
-    f['FECHA ALTA'] = new Date().toLocaleDateString('es-AR');
-    f['ESTADO'] = 'PENDIENTE';
-    setForm(f); setModal(true); setMsg('');
-  };
-
-  const handleGuardar = async () => {
-    if (!form['APELLIDO Y NOMBRE'] && !form[camposActivos[0]]) {
-      setMsg('❌ Completá el nombre del beneficiario');
-      return;
-    }
-    setGuardando(true);
-    try {
-      await api.post('/api/facturacion/datos/altas', form);
-      setMsg('✅ Alta registrada');
-      setModal(false);
-      cargarDatos();
-    } catch {
-      setMsg('❌ Error al guardar');
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  const estadoBadge = (estado: string) => {
-    const s = String(estado || '').toUpperCase();
-    if (s === 'APROBADO' || s === 'ACTIVO') return <span className="badge badge-green">{estado}</span>;
-    if (s === 'RECHAZADO' || s === 'BAJA') return <span className="badge badge-red">{estado}</span>;
-    if (s === 'PENDIENTE') return <span className="badge badge-amber">Pendiente</span>;
-    return <span className="badge badge-gray">{estado || '—'}</span>;
-  };
+  if (tipoLoading) return <div style={{padding:'2rem',color:'var(--text3)'}}><span className="spinner"/> Verificando…</div>;
+  if (tipo !== 'transporte_escolar') return null;
 
   return (
     <div>
-      <div className="section-header">
-        <h2 className="section-title">📋 Altas (PRES IS)</h2>
-        <button className="btn btn-primary" onClick={abrirModal}>+ Nueva alta</button>
-      </div>
+      <style>{printCSS}</style>
 
-      {msg && (
-        <div style={{ marginBottom: '1rem', padding: '.65rem 1rem', borderRadius: 'var(--radius)', background: msg.startsWith('✅') ? 'var(--green-dim)' : 'var(--red-dim)', color: msg.startsWith('✅') ? 'var(--green)' : 'var(--red)', border: `1px solid ${msg.startsWith('✅') ? 'rgba(16,185,129,.3)' : 'rgba(239,68,68,.3)'}` }}>
-          {msg}
+      {/* Controles */}
+      <div className="no-print section-header" style={{ marginBottom:'1.25rem' }}>
+        <h2 className="section-title">📋 Altas PRES IS</h2>
+        <div style={{ display:'flex', gap:'.5rem' }}>
+          <button className="btn btn-secondary" onClick={cargar} disabled={loading}>↻ Recargar</button>
+          <button className="btn btn-primary" onClick={()=>window.print()}>🖨️ Imprimir todos</button>
         </div>
-      )}
-
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
-        {[
-          { label: 'Total altas', value: registros.length, color: 'var(--blue)' },
-          { label: 'Pendientes', value: registros.filter(r => String(r['ESTADO'] || '').toUpperCase() === 'PENDIENTE').length, color: 'var(--amber)' },
-          { label: 'Aprobadas', value: registros.filter(r => ['APROBADO','ACTIVO'].includes(String(r['ESTADO'] || '').toUpperCase())).length, color: 'var(--green)' },
-        ].map(s => (
-          <div key={s.label} className="stat-card">
-            <p className="stat-label">{s.label}</p>
-            <p className="stat-value" style={{ color: s.color }}>{s.value}</p>
-          </div>
-        ))}
       </div>
 
-      {/* Filtros */}
-      <div className="filter-bar">
-        <input className="input" placeholder="Buscar por nombre, DNI, obra social…" value={busqueda} onChange={e => setBusqueda(e.target.value)} style={{ maxWidth: '320px' }} />
-        <span style={{ color: 'var(--text3)', fontSize: '.82rem' }}>{filtrados.length} de {registros.length}</span>
-        <button className="btn btn-secondary" onClick={cargarDatos} style={{ marginLeft: 'auto' }}>↻</button>
-      </div>
-
-      {/* Tabla */}
       {loading ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', color: 'var(--text3)', padding: '2rem' }}>
-          <span className="spinner" /> Cargando…
-        </div>
-      ) : filtrados.length === 0 ? (
-        <div className="empty-state card">
-          <div className="empty-icon">📋</div>
-          <p>Sin altas PRES IS registradas</p>
-          <p style={{ marginTop: '.5rem', fontSize: '.8rem' }}>Registrá las altas de prestación para los beneficiarios</p>
-        </div>
+        <div style={{display:'flex',alignItems:'center',gap:'.75rem',color:'var(--text3)',padding:'2rem'}}><span className="spinner"/> Cargando…</div>
+      ) : lista.length === 0 ? (
+        <div className="empty-state no-print"><div className="empty-icon">📋</div><p>Sin altas registradas</p></div>
       ) : (
-        <div className="tabla-wrap">
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Beneficiario</th>
-                <th>DNI</th>
-                <th>N° Afiliado</th>
-                <th>Obra Social</th>
-                <th>Fecha Alta</th>
-                <th>Tipo Pres.</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.map(reg => (
-                <tr key={reg.id}>
-                  <td style={{ fontWeight: 500, color: 'var(--text)' }}>{String(reg['APELLIDO Y NOMBRE'] || '—')}</td>
-                  <td>{String(reg['DNI'] || '—')}</td>
-                  <td>{String(reg['N° AFILIADO'] || '—')}</td>
-                  <td>{String(reg['OBRA SOCIAL'] || '—')}</td>
-                  <td>{String(reg['FECHA ALTA'] || '—')}</td>
-                  <td>{String(reg['TIPO PRES'] || '—')}</td>
-                  <td>{estadoBadge(String(reg['ESTADO'] || ''))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Modal */}
-      {modal && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: '600px' }}>
-            <p className="modal-title">📋 Nueva Alta PRES IS</p>
-            <div className="form-grid form-grid-2">
-              {camposActivos.map(h => (
-                <div key={h} style={h === 'OBSERVACIONES' ? { gridColumn: '1 / -1' } : {}}>
-                  <label className="label">{h}</label>
-                  {h === 'ESTADO' ? (
-                    <select className="select" value={form[h] || ''} onChange={e => setForm(f => ({ ...f, [h]: e.target.value }))}>
-                      <option value="PENDIENTE">Pendiente</option>
-                      <option value="APROBADO">Aprobado</option>
-                      <option value="ACTIVO">Activo</option>
-                      <option value="BAJA">Baja</option>
-                      <option value="RECHAZADO">Rechazado</option>
-                    </select>
-                  ) : h === 'OBSERVACIONES' ? (
-                    <textarea className="textarea" rows={3} value={form[h] || ''} onChange={e => setForm(f => ({ ...f, [h]: e.target.value }))} />
-                  ) : (
-                    <input className="input" value={form[h] || ''} onChange={e => setForm(f => ({ ...f, [h]: e.target.value }))} />
-                  )}
-                </div>
-              ))}
-            </div>
-            {msg && <p style={{ color: 'var(--red)', fontSize: '.85rem', marginTop: '.75rem' }}>{msg}</p>}
-            <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
-              <button className="btn btn-secondary" onClick={() => { setModal(false); setMsg(''); }}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleGuardar} disabled={guardando}>
-                {guardando ? <span className="spinner" style={{ width: 14, height: 14 }} /> : 'Guardar alta'}
-              </button>
-            </div>
-          </div>
+        <div>
+          <p className="no-print" style={{ fontSize:'.82rem', color:'var(--text3)', marginBottom:'1rem' }}>
+            {lista.length} carta{lista.length!==1?'s':''} de inscripción listas para imprimir
+          </p>
+          {lista.map(b => <CartaAlta key={b.id} b={b} />)}
         </div>
       )}
     </div>

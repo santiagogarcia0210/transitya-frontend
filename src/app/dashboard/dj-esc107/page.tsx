@@ -1,23 +1,33 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { toArray } from '@/lib/utils';
+import { serializarFirestore, toArray } from '@/lib/utils';
+import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
 
 interface Beneficiario {
   id: string;
   nombre?: string;
   'APELLIDO Y NOMBRE'?: string;
+  dni?: string;
   DNI?: string;
   'N° AFILIADO'?: string;
+  obraSocial?: string;
   'OBRA SOCIAL'?: string;
+  chofer?: string;
   CHOFER?: string;
+  domicilio?: string;
   DOMICILIO?: string;
+  localidad?: string;
   LOCALIDAD?: string;
 }
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 export default function DJEsc107Page() {
+  const router = useRouter();
+  const { tipo, loading: tipoLoading } = useEmpresaTipo();
+
   const hoy = new Date();
   const [mes,  setMes]  = useState(hoy.getMonth() + 1);
   const [anio, setAnio] = useState(hoy.getFullYear());
@@ -26,13 +36,32 @@ export default function DJEsc107Page() {
   const [loading,       setLoading]       = useState(false);
   const [busqueda,      setBusqueda]      = useState('');
 
-  useEffect(() => { cargarBenef(); }, []);
+  useEffect(() => {
+    if (!tipoLoading && tipo !== null && tipo !== 'transporte_escolar') {
+      router.replace('/dashboard');
+    }
+  }, [tipo, tipoLoading, router]);
+
+  useEffect(() => {
+    if (tipo === 'transporte_escolar') cargarBenef();
+  }, [mes, anio, tipo]);
 
   const cargarBenef = async () => {
     setLoading(true);
     try {
-      const r = await api.get('/api/beneficiarios');
-      setBeneficiarios(toArray(r.data));
+      // Intentar endpoint dedicado del mes
+      let data: Beneficiario[] = [];
+      try {
+        const r = await api.get(`/api/planillas/dj107?mes=${mes}&anio=${anio}`);
+        const d = serializarFirestore(r.data);
+        data = toArray(d?.beneficiarios ?? d);
+      } catch { /* fallback */ }
+
+      if (data.length === 0) {
+        const r = await api.get('/api/beneficiarios');
+        data = toArray(r.data).map(serializarFirestore);
+      }
+      setBeneficiarios(data);
     } finally {
       setLoading(false);
     }
@@ -43,12 +72,19 @@ export default function DJEsc107Page() {
   const benefFiltrados = busqueda
     ? beneficiarios.filter(b =>
         nombre(b).toLowerCase().includes(busqueda.toLowerCase()) ||
-        (b.DNI || '').includes(busqueda) ||
+        (b.dni || b.DNI || '').includes(busqueda) ||
         (b['N° AFILIADO'] || '').includes(busqueda)
       )
     : beneficiarios;
 
   const handlePrint = () => window.print();
+
+  if (tipoLoading) return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', color: 'var(--text3)', padding: '2rem' }}>
+      <span className="spinner" /> Verificando acceso…
+    </div>
+  );
+  if (tipo !== 'transporte_escolar') return null;
 
   return (
     <div>
@@ -108,7 +144,7 @@ export default function DJEsc107Page() {
                 >
                   <p style={{ fontSize: '.85rem', fontWeight: 500, color: 'var(--text)' }}>{nombre(b)}</p>
                   <p style={{ fontSize: '.75rem', color: 'var(--text3)' }}>
-                    {b.DNI && `DNI: ${b.DNI}`}
+                    {(b.dni || b.DNI) && `DNI: ${b.dni || b.DNI}`}
                     {b['N° AFILIADO'] && ` · Afil: ${b['N° AFILIADO']}`}
                   </p>
                 </div>
@@ -165,24 +201,24 @@ export default function DJEsc107Page() {
                   </tr>
                   <tr>
                     <td style={{ border: '1px solid #000', padding: '4px 8px', background: '#f5f5f5', fontWeight: 700 }}>D.N.I.:</td>
-                    <td style={{ border: '1px solid #000', padding: '4px 8px' }}>{seleccionado.DNI || '________________________'}</td>
+                    <td style={{ border: '1px solid #000', padding: '4px 8px' }}>{seleccionado.dni || seleccionado.DNI || '________________________'}</td>
                   </tr>
                   <tr>
                     <td style={{ border: '1px solid #000', padding: '4px 8px', background: '#f5f5f5', fontWeight: 700 }}>Domicilio:</td>
-                    <td style={{ border: '1px solid #000', padding: '4px 8px' }}>{seleccionado.DOMICILIO || '___________________________________________________'}</td>
+                    <td style={{ border: '1px solid #000', padding: '4px 8px' }}>{seleccionado.domicilio || seleccionado.DOMICILIO || '___________________________________________________'}</td>
                   </tr>
                   <tr>
                     <td style={{ border: '1px solid #000', padding: '4px 8px', background: '#f5f5f5', fontWeight: 700 }}>Localidad:</td>
-                    <td style={{ border: '1px solid #000', padding: '4px 8px' }}>{seleccionado.LOCALIDAD || '___________________________________________________'}</td>
+                    <td style={{ border: '1px solid #000', padding: '4px 8px' }}>{seleccionado.localidad || seleccionado.LOCALIDAD || '___________________________________________________'}</td>
                   </tr>
                   <tr>
                     <td style={{ border: '1px solid #000', padding: '4px 8px', background: '#f5f5f5', fontWeight: 700 }}>Obra Social:</td>
-                    <td style={{ border: '1px solid #000', padding: '4px 8px' }}>{seleccionado['OBRA SOCIAL'] || '___________________________________________________'}</td>
+                    <td style={{ border: '1px solid #000', padding: '4px 8px' }}>{seleccionado.obraSocial || seleccionado['OBRA SOCIAL'] || '___________________________________________________'}</td>
                   </tr>
-                  {seleccionado.CHOFER && (
+                  {(seleccionado.chofer || seleccionado.CHOFER) && (
                     <tr>
                       <td style={{ border: '1px solid #000', padding: '4px 8px', background: '#f5f5f5', fontWeight: 700 }}>Prestador / Chofer:</td>
-                      <td style={{ border: '1px solid #000', padding: '4px 8px' }}>{seleccionado.CHOFER}</td>
+                      <td style={{ border: '1px solid #000', padding: '4px 8px' }}>{seleccionado.chofer || seleccionado.CHOFER}</td>
                     </tr>
                   )}
                 </tbody>

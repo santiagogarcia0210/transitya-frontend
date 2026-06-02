@@ -1,8 +1,11 @@
 import axios from 'axios';
 import { getAuth, type User } from 'firebase/auth';
 
+// Usar URL relativa para que todas las llamadas pasen por Next.js.
+// En producción, los fallback rewrites en next.config.ts proxean
+// los endpoints que Next.js no maneja directamente a Railway.
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://transitya-backend-production.up.railway.app'
+  baseURL: process.env.NEXT_PUBLIC_API_URL || '',
 });
 
 api.interceptors.request.use(async (config) => {
