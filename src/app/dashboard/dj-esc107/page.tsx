@@ -37,13 +37,13 @@ export default function DJEsc107Page() {
   const [busqueda,      setBusqueda]      = useState('');
 
   useEffect(() => {
-    if (!tipoLoading && tipo !== null && tipo !== 'transporte_escolar') {
+    if (!tipoLoading && tipo !== null && tipo !== 'transporte_escolar' && tipo !== 'transporte_especial') {
       router.replace('/dashboard');
     }
   }, [tipo, tipoLoading, router]);
 
   useEffect(() => {
-    if (tipo === 'transporte_escolar') cargarBenef();
+    if ((tipo === 'transporte_escolar' || tipo === 'transporte_especial')) cargarBenef();
   }, [mes, anio, tipo]);
 
   const cargarBenef = async () => {
@@ -84,7 +84,7 @@ export default function DJEsc107Page() {
       <span className="spinner" /> Verificando acceso…
     </div>
   );
-  if (tipo !== 'transporte_escolar') return null;
+  if (tipo !== 'transporte_escolar' && tipo !== 'transporte_especial') return null;
 
   return (
     <div>

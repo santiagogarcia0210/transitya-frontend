@@ -77,7 +77,7 @@ export default function PresentacionDocsPage() {
 
   /* Guard */
   useEffect(() => {
-    if (!tipoLoading && empresaTipo !== null && empresaTipo !== 'transporte_escolar') {
+    if (!tipoLoading && empresaTipo !== null && empresaTipo !== 'transporte_escolar' && empresaTipo !== 'transporte_especial') {
       router.replace('/dashboard');
     }
   }, [empresaTipo, tipoLoading, router]);
@@ -92,7 +92,7 @@ export default function PresentacionDocsPage() {
   };
 
   useEffect(() => {
-    if (empresaTipo === 'transporte_escolar') cargar();
+    if (empresaTipo === 'transporte_escolar' || empresaTipo === 'transporte_especial') cargar();
   }, [empresaTipo]);
 
   const filtrados = lista.filter(r => {
@@ -138,7 +138,7 @@ export default function PresentacionDocsPage() {
   };
 
   if (tipoLoading) return <div style={{ padding: '2rem', color: 'var(--text3)' }}><span className="spinner" /> Verificando acceso…</div>;
-  if (empresaTipo !== 'transporte_escolar') return null;
+  if (empresaTipo !== 'transporte_escolar' && empresaTipo !== 'transporte_especial') return null;
 
   const pendientes = lista.filter(r => r.estado === 'Pendiente').length;
 

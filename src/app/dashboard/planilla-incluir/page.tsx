@@ -230,7 +230,7 @@ export default function PlanillaIncluirPage() {
   const [idxActual,    setIdxActual]    = useState(0);
 
   useEffect(() => {
-    if (!tipoLoading && tipo !== null && tipo !== 'transporte_escolar') router.replace('/dashboard');
+    if (!tipoLoading && tipo !== null && tipo !== 'transporte_escolar' && tipo !== 'transporte_especial') router.replace('/dashboard');
   }, [tipo, tipoLoading, router]);
 
   const cargar = useCallback(async () => {
@@ -252,12 +252,12 @@ export default function PlanillaIncluirPage() {
     setLoading(false);
   }, [mes, anio]);
 
-  useEffect(() => { if (tipo === 'transporte_escolar') cargar(); }, [tipo, cargar]);
+  useEffect(() => { if ((tipo === 'transporte_escolar' || tipo === 'transporte_especial')) cargar(); }, [tipo, cargar]);
 
   const benef = beneficiarios[idxActual] || null;
 
   if (tipoLoading) return <div style={{padding:'2rem',color:'var(--text3)'}}><span className="spinner"/> Verificando…</div>;
-  if (tipo !== 'transporte_escolar') return null;
+  if (tipo !== 'transporte_escolar' && tipo !== 'transporte_especial') return null;
 
   return (
     <div>

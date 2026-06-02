@@ -141,7 +141,7 @@ export default function CambioTransportePage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!tipoLoading && tipo !== null && tipo !== 'transporte_escolar') router.replace('/dashboard');
+    if (!tipoLoading && tipo !== null && tipo !== 'transporte_escolar' && tipo !== 'transporte_especial') router.replace('/dashboard');
   }, [tipo, tipoLoading, router]);
 
   const cargar = async () => {
@@ -153,10 +153,10 @@ export default function CambioTransportePage() {
     setLoading(false);
   };
 
-  useEffect(() => { if (tipo === 'transporte_escolar') cargar(); }, [tipo]);
+  useEffect(() => { if ((tipo === 'transporte_escolar' || tipo === 'transporte_especial')) cargar(); }, [tipo]);
 
   if (tipoLoading) return <div style={{padding:'2rem',color:'var(--text3)'}}><span className="spinner"/> Verificando…</div>;
-  if (tipo !== 'transporte_escolar') return null;
+  if (tipo !== 'transporte_escolar' && tipo !== 'transporte_especial') return null;
 
   return (
     <div>
