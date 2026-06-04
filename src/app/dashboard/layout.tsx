@@ -5,7 +5,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import Sidebar from '@/components/layout/Sidebar';
 
-// Todas las rutas del dashboard requieren auth — no pre-renderizar estáticamente
 export const dynamic = 'force-dynamic';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -19,9 +18,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [router]);
 
   return (
-    <div className="flex min-h-screen bg-gray-950">
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
       <Sidebar />
-      <main className="flex-1 p-8 overflow-auto">
+      <main
+        className="dashboard-main"
+        style={{
+          flex: 1, padding: '2rem', overflowY: 'auto', minWidth: 0,
+          background: 'var(--bg)',
+        }}
+      >
         {children}
       </main>
     </div>
