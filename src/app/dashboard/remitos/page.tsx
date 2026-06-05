@@ -3,8 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 
-const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const TIPOS_COMB = ['Nafta Super', 'Nafta Premium', 'Diesel', 'Gasoil', 'GNC', 'Otro'];
+const TIPOS_COMB =['Nafta Super', 'Nafta Premium', 'Diesel', 'Gasoil', 'GNC', 'Otro'];
 
 interface Remito {
   id: string; fecha: string; nroRemito: string; razonSocial: string;
@@ -63,7 +62,8 @@ export default function RemitosPage() {
   const [lista,         setLista]         = useState<Remito[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [filtroBusq,    setFiltroBusq]    = useState('');
-  const [filtroMes,     setFiltroMes]     = useState('');
+  const [filtroDesde,   setFiltroDesde]   = useState('');
+  const [filtroHasta,   setFiltroHasta]   = useState('');
   const [filtroChofer,  setFiltroChofer]  = useState('');
   const [showModal,     setShowModal]     = useState(false);
   const [form,          setForm]          = useState<FormState>(EMPTY);
@@ -76,8 +76,6 @@ export default function RemitosPage() {
   const [msg,           setMsg]           = useState<{ text: string; ok: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const hoy = new Date();
-  const anioActual = hoy.getFullYear();
 
   const cargar = async () => {
     setLoading(true);
@@ -96,22 +94,14 @@ export default function RemitosPage() {
     const q = filtroBusq.toLowerCase();
     if (q && !r.razonSocial.toLowerCase().includes(q) && !r.nroRemito.toLowerCase().includes(q) && !r.cuit.includes(q)) return false;
     if (filtroChofer && r.chofer !== filtroChofer) return false;
-    if (filtroMes) {
-      const [mes, anio] = filtroMes.split('-');
-      if (!r.fecha.includes(`/${mes}/${anio}`) && !r.fecha.startsWith(`${anio}-${mes}`)) return false;
-    }
+    if (filtroDesde && r.fecha < filtroDesde) return false;
+    if (filtroHasta && r.fecha > filtroHasta) return false;
     return true;
   });
 
   const totalMonto       = filtrados.reduce((s, r) => s + r.monto, 0);
   const totalCombustible = filtrados.reduce((s, r) => s + r.combustible, 0);
 
-  const mesesFiltro = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(anioActual, hoy.getMonth() - i, 1);
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const a = d.getFullYear();
-    return { value: `${m}-${a}`, label: `${MESES[d.getMonth()]} ${a}` };
-  });
 
   const setF = (k: keyof FormState) =>
     (ev: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -267,13 +257,19 @@ export default function RemitosPage() {
             {choferes.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
-        <select className="select" value={filtroMes} onChange={e => setFiltroMes(e.target.value)}>
-          <option value="">Todos los meses</option>
-          {mesesFiltro.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-        </select>
-        {(filtroBusq || filtroChofer || filtroMes) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+          <label style={{ fontSize: '.78rem', color: 'var(--text3)', fontWeight: 500, whiteSpace: 'nowrap' }}>Desde</label>
+          <input type="date" className="input" style={{ width: 148 }}
+            value={filtroDesde} onChange={e => setFiltroDesde(e.target.value)} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+          <label style={{ fontSize: '.78rem', color: 'var(--text3)', fontWeight: 500, whiteSpace: 'nowrap' }}>Hasta</label>
+          <input type="date" className="input" style={{ width: 148 }}
+            value={filtroHasta} onChange={e => setFiltroHasta(e.target.value)} />
+        </div>
+        {(filtroBusq || filtroChofer || filtroDesde || filtroHasta) && (
           <button className="btn btn-secondary" style={{ fontSize: '.78rem' }}
-            onClick={() => { setFiltroBusq(''); setFiltroChofer(''); setFiltroMes(''); }}>
+            onClick={() => { setFiltroBusq(''); setFiltroChofer(''); setFiltroDesde(''); setFiltroHasta(''); }}>
             ✕ Limpiar
           </button>
         )}
