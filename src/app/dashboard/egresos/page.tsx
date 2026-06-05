@@ -3,13 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 
-const CATEGORIAS = ['Combustible', 'Repuesto', 'Mantenimiento', 'Seguro', 'Peaje', 'Otro'];
-const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+type TabEgr = 'carga' | 'buscar' | 'stats';
 
-const BADGE_CAT: Record<string, string> = {
-  Combustible: 'badge-amber', Repuesto: 'badge-blue', Mantenimiento: 'badge-purple',
-  Seguro: 'badge-teal', Peaje: 'badge-gray', Otro: 'badge-gray',
-};
+const CATEGORIAS = ['Combustible', 'Repuesto', 'Mantenimiento', 'Seguro', 'Peaje', 'Limpieza', 'Otro'];
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 interface Egreso {
   id: string; fecha: string; concepto: string; monto: number;
@@ -30,16 +27,16 @@ function normalizar(e: Record<string, unknown>): Egreso {
     id:           String(e.id || ''),
     fecha:        String(e.fecha        || e.FECHA        || ''),
     concepto:     String(e.concepto     || e.CONCEPTO     || ''),
-    monto:        Number(e.monto        || e.MONTO        || 0),
+    monto:        Number(e.monto        || e.MONTO        || e.IMPORTE || e.TOTAL || 0),
     categoria:    String(e.categoria    || e.CATEGORIA    || 'Otro'),
-    proveedor:    String(e.proveedor    || e.PROVEEDOR    || ''),
-    chofer:       String(e.chofer       || e.CHOFER       || ''),
+    proveedor:    String(e.proveedor    || e.PROVEEDOR    || e.COMERCIO || ''),
+    chofer:       String(e.chofer       || e.CHOFER       || e.USUARIO  || ''),
     observaciones:String(e.observaciones|| e.OBSERVACIONES|| ''),
     comprobante:  String(e.comprobante  || e.COMPROBANTE  || ''),
   };
 }
 
-const labelStyle: React.CSSProperties = {
+const L: React.CSSProperties = {
   display: 'block', fontSize: '.78rem', color: 'var(--text3)', marginBottom: '.3rem', fontWeight: 500,
 };
 
@@ -47,25 +44,36 @@ const fmt = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
 
 export default function EgresosPage() {
+  const [tab,            setTab]            = useState<TabEgr>('carga');
   const [lista,          setLista]          = useState<Egreso[]>([]);
   const [loading,        setLoading]        = useState(true);
-  const [filtroBusq,     setFiltroBusq]     = useState('');
-  const [filtroCateg,    setFiltroCateg]    = useState('');
-  const [filtroMes,      setFiltroMes]      = useState('');
-  const [filtroChofer,   setFiltroChofer]   = useState('');
-  const [showModal,      setShowModal]      = useState(false);
+
+  /* ── Tab Carga ── */
   const [form,           setForm]           = useState<FormState>(EMPTY);
   const [archivo,        setArchivo]        = useState<File | null>(null);
   const [previewUrl,     setPreviewUrl]     = useState('');
   const [saving,         setSaving]         = useState(false);
   const [scanning,       setScanning]       = useState(false);
   const [dupWarning,     setDupWarning]     = useState(false);
-  const [confirmDelete,  setConfirmDelete]  = useState<string | null>(null);
-  const [msg,            setMsg]            = useState<{ text: string; ok: boolean } | null>(null);
+  const [msgCarga,       setMsgCarga]       = useState<{ text: string; ok: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  /* ── Tab Buscar ── */
+  const [busqText,       setBusqText]       = useState('');
+  const [filtroDesde,    setFiltroDesde]    = useState('');
+  const [filtroHasta,    setFiltroHasta]    = useState('');
+  const [filtroMontoMin, setFiltroMontoMin] = useState('');
+  const [filtroMontoMax, setFiltroMontoMax] = useState('');
+  const [filtroCateg,    setFiltroCateg]    = useState('');
+  const [filtroChofer,   setFiltroChofer]   = useState('');
+  const [showFiltros,    setShowFiltros]    = useState(false);
+  const [confirmDelete,  setConfirmDelete]  = useState<string | null>(null);
+
+  /* ── Tab Stats ── */
+  const [statsMes,       setStatsMes]       = useState(() => new Date().getMonth());
+  const [statsAnio,      setStatsAnio]      = useState(() => new Date().getFullYear());
+
   const hoy = new Date();
-  const anioActual = hoy.getFullYear();
 
   const cargar = async () => {
     setLoading(true);
@@ -80,37 +88,33 @@ export default function EgresosPage() {
 
   const choferes = [...new Set(lista.map(e => e.chofer).filter(Boolean))].sort();
 
+  /* ── Filtrado para búsqueda ── */
   const filtrados = lista.filter(e => {
-    const q = filtroBusq.toLowerCase();
-    if (q && !e.concepto.toLowerCase().includes(q) && !e.proveedor.toLowerCase().includes(q)) return false;
+    const q = busqText.toLowerCase();
+    if (q && !e.concepto.toLowerCase().includes(q) &&
+             !e.proveedor.toLowerCase().includes(q) &&
+             !e.chofer.toLowerCase().includes(q) &&
+             !e.observaciones.toLowerCase().includes(q)) return false;
+    if (filtroDesde && e.fecha < filtroDesde) return false;
+    if (filtroHasta && e.fecha > filtroHasta) return false;
+    if (filtroMontoMin && e.monto < Number(filtroMontoMin)) return false;
+    if (filtroMontoMax && e.monto > Number(filtroMontoMax)) return false;
     if (filtroCateg && e.categoria !== filtroCateg) return false;
     if (filtroChofer && e.chofer !== filtroChofer) return false;
-    if (filtroMes) {
-      const [mes, anio] = filtroMes.split('-');
-      if (!e.fecha.includes(`/${mes}/${anio}`) && !e.fecha.startsWith(`${anio}-${mes}`)) return false;
-    }
     return true;
   });
 
+  const limpiarFiltros = () => {
+    setBusqText(''); setFiltroDesde(''); setFiltroHasta('');
+    setFiltroMontoMin(''); setFiltroMontoMax(''); setFiltroCateg(''); setFiltroChofer('');
+  };
+
   const total = filtrados.reduce((s, e) => s + e.monto, 0);
 
+  /* ── Carga: helpers ── */
   const setF = (k: keyof FormState) =>
     (ev: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(f => ({ ...f, [k]: ev.target.value }));
-
-  const abrirNuevo = () => {
-    setForm(EMPTY); setArchivo(null); setPreviewUrl('');
-    setDupWarning(false); setMsg(null); setShowModal(true);
-  };
-
-  const abrirEdicion = (e: Egreso) => {
-    setForm({ id: e.id, fecha: e.fecha, concepto: e.concepto, monto: String(e.monto),
-      categoria: e.categoria, proveedor: e.proveedor, chofer: e.chofer, observaciones: e.observaciones });
-    setArchivo(null); setPreviewUrl(e.comprobante || '');
-    setDupWarning(false); setMsg(null); setShowModal(true);
-  };
-
-  const cerrarModal = () => { setShowModal(false); setMsg(null); setDupWarning(false); };
 
   const onArchivo = (ev: React.ChangeEvent<HTMLInputElement>) => {
     const f = ev.target.files?.[0] || null;
@@ -135,15 +139,14 @@ export default function EgresosPage() {
         proveedor: d.proveedor || d.PROVEEDOR || f.proveedor,
       }));
     } catch {
-      setMsg({ text: 'No se pudo escanear el comprobante', ok: false });
+      setMsgCarga({ text: 'No se pudo escanear el comprobante', ok: false });
     }
     setScanning(false);
   };
 
   const guardar = async (forzar = false) => {
     if (!form.fecha || !form.concepto || !form.monto) {
-      setMsg({ text: 'Completá fecha, concepto y monto', ok: false });
-      return;
+      setMsgCarga({ text: 'Completá fecha, concepto y monto', ok: false }); return;
     }
     if (!forzar && !form.id) {
       try {
@@ -151,7 +154,7 @@ export default function EgresosPage() {
         if (r.data?.duplicado) { setDupWarning(true); return; }
       } catch { /* endpoint opcional */ }
     }
-    setSaving(true); setMsg(null);
+    setSaving(true); setMsgCarga(null);
     try {
       let payload: FormData | Record<string, string>;
       if (archivo) {
@@ -164,12 +167,14 @@ export default function EgresosPage() {
       }
       if (form.id) {
         await api.put(`/api/egresos/${form.id}`, payload);
+        setMsgCarga({ text: '✅ Egreso actualizado.', ok: true });
       } else {
         await api.post('/api/egresos', payload);
+        setMsgCarga({ text: '✅ Egreso guardado.', ok: true });
+        setForm(EMPTY); setArchivo(null); setPreviewUrl('');
       }
-      cerrarModal();
       cargar();
-    } catch { setMsg({ text: 'Error al guardar', ok: false }); }
+    } catch { setMsgCarga({ text: 'Error al guardar', ok: false }); }
     setSaving(false);
   };
 
@@ -178,215 +183,342 @@ export default function EgresosPage() {
     catch { /* silent */ }
   };
 
-  const mesesFiltro = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(anioActual, hoy.getMonth() - i, 1);
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const a = d.getFullYear();
-    return { value: `${m}-${a}`, label: `${MESES[d.getMonth()]} ${a}` };
+  /* ── Stats ── */
+  const egresosDelMes = lista.filter(e => {
+    if (!e.fecha) return false;
+    const d = new Date(e.fecha.includes('/') ? e.fecha.split('/').reverse().join('-') : e.fecha);
+    return d.getMonth() === statsMes && d.getFullYear() === statsAnio;
   });
+
+  const porCategoria = CATEGORIAS.map(cat => ({
+    cat, total: egresosDelMes.filter(e => e.categoria === cat).reduce((s, e) => s + e.monto, 0),
+    count: egresosDelMes.filter(e => e.categoria === cat).length,
+  })).filter(c => c.total > 0).sort((a, b) => b.total - a.total);
+
+  const totalMes = egresosDelMes.reduce((s, e) => s + e.monto, 0);
+  const maxCateg = Math.max(...porCategoria.map(c => c.total), 1);
+
+  const CATEG_COLORS: Record<string, string> = {
+    Combustible: 'var(--amber)', Repuesto: 'var(--blue)', Mantenimiento: 'var(--purple)',
+    Seguro: 'var(--teal)', Peaje: 'var(--green)', Limpieza: 'var(--blue)', Otro: 'var(--text3)',
+  };
 
   return (
     <div>
       {/* Header */}
       <div className="section-header">
         <div>
-          <h2 className="section-title">💸 Egresos</h2>
-          <p style={{ fontSize: '.82rem', color: 'var(--text3)', marginTop: '.2rem' }}>
-            {filtrados.length} registro{filtrados.length !== 1 ? 's' : ''} ·{' '}
-            <strong style={{ color: 'var(--red)' }}>{fmt(total)}</strong>
-          </p>
+          <div className="section-icon amber">💸</div>
         </div>
-        <button className="btn btn-primary" onClick={abrirNuevo}>+ Nuevo egreso</button>
+        <div style={{ flex:1 }}>
+          <div className="section-title">Egresos</div>
+          <div className="section-sub">Gastos y comprobantes</div>
+        </div>
       </div>
 
-      {/* Filtros */}
-      <div className="filter-bar">
-        <input className="input" placeholder="Buscar concepto o proveedor…"
-          value={filtroBusq} onChange={e => setFiltroBusq(e.target.value)} />
-        <select className="select" value={filtroCateg} onChange={e => setFiltroCateg(e.target.value)}>
-          <option value="">Todas las categorías</option>
-          {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        {choferes.length > 0 && (
-          <select className="select" value={filtroChofer} onChange={e => setFiltroChofer(e.target.value)}>
-            <option value="">Todos los choferes</option>
-            {choferes.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        )}
-        <select className="select" value={filtroMes} onChange={e => setFiltroMes(e.target.value)}>
-          <option value="">Todos los meses</option>
-          {mesesFiltro.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-        </select>
-        {(filtroBusq || filtroCateg || filtroChofer || filtroMes) && (
-          <button className="btn btn-secondary" style={{ fontSize: '.78rem' }}
-            onClick={() => { setFiltroBusq(''); setFiltroCateg(''); setFiltroChofer(''); setFiltroMes(''); }}>
-            ✕ Limpiar
-          </button>
-        )}
+      {/* Tabs */}
+      <div className="tabs-inner" style={{ marginBottom:'1rem' }}>
+        <button className={`tab-inner${tab==='carga'?' active':''}`} onClick={() => { setTab('carga'); setMsgCarga(null); }}>
+          Nueva carga
+        </button>
+        <button className={`tab-inner${tab==='buscar'?' active':''}`} onClick={() => setTab('buscar')}>
+          Consultar
+        </button>
+        <button className={`tab-inner${tab==='stats'?' active':''}`} onClick={() => setTab('stats')}>
+          📊 Estadísticas
+        </button>
       </div>
 
-      {/* Lista */}
-      {loading ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', color: 'var(--text3)', padding: '2rem 0' }}>
-          <span className="spinner" /> Cargando egresos…
-        </div>
-      ) : filtrados.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">💸</div>
-          <p>Sin egresos registrados</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
-          {filtrados.map(e => (
-            <div key={e.id} className="card"
-              style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.75rem 1rem', cursor: 'pointer' }}
-              onClick={() => abrirEdicion(e)}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '.88rem', fontWeight: 600, color: 'var(--text)' }}>{e.concepto}</span>
-                  <span className={`badge ${BADGE_CAT[e.categoria] || 'badge-gray'}`}>{e.categoria}</span>
-                </div>
-                <p style={{ fontSize: '.78rem', color: 'var(--text3)', marginTop: '.15rem' }}>
-                  {e.fecha}
-                  {e.chofer && ` · ${e.chofer}`}
-                  {e.proveedor && ` · ${e.proveedor}`}
-                  {e.observaciones && ` · ${e.observaciones}`}
-                </p>
-              </div>
-              <p style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--red)', whiteSpace: 'nowrap' }}>
-                {fmt(e.monto)}
-              </p>
-              {confirmDelete === e.id ? (
-                <div style={{ display: 'flex', gap: '.4rem' }} onClick={ev => ev.stopPropagation()}>
-                  <button className="btn btn-danger" style={{ fontSize: '.75rem', padding: '.3rem .6rem' }}
-                    onClick={() => eliminar(e.id)}>Confirmar</button>
-                  <button className="btn btn-secondary" style={{ fontSize: '.75rem', padding: '.3rem .6rem' }}
-                    onClick={() => setConfirmDelete(null)}>Cancelar</button>
-                </div>
-              ) : (
-                <button className="btn btn-secondary" style={{ fontSize: '.75rem', padding: '.3rem .6rem' }}
-                  onClick={ev => { ev.stopPropagation(); setConfirmDelete(e.id); }}>🗑</button>
-              )}
+      {/* ═══ TAB CARGA ═══ */}
+      {tab === 'carga' && (
+        <div className="card">
+          <div className="card-title">Nuevo egreso</div>
+          <div className="form-grid">
+            <div className="form-grid form-grid-2">
+              <div><label style={L}>Fecha *</label>
+                <input type="date" className="input" value={form.fecha} onChange={setF('fecha')} /></div>
+              <div><label style={L}>Monto *</label>
+                <input type="number" className="input" placeholder="0" value={form.monto} onChange={setF('monto')} /></div>
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Modal */}
-      {showModal && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}
-          onClick={e => { if (e.target === e.currentTarget) cerrarModal(); }}>
-          <div className="card" style={{ width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: '1.25rem' }}>
-              {form.id ? '✏️ Editar egreso' : '+ Nuevo egreso'}
-            </h3>
-
-            <div className="form-grid">
-              <div className="form-grid form-grid-2">
-                <div>
-                  <label style={labelStyle}>Fecha *</label>
-                  <input type="date" className="input" value={form.fecha} onChange={setF('fecha')} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Monto *</label>
-                  <input type="number" className="input" placeholder="0" value={form.monto} onChange={setF('monto')} />
-                </div>
-              </div>
-              <div>
-                <label style={labelStyle}>Concepto *</label>
-                <input type="text" className="input" placeholder="Ej: Nafta YPF" value={form.concepto} onChange={setF('concepto')} />
-              </div>
-              <div className="form-grid form-grid-2">
-                <div>
-                  <label style={labelStyle}>Categoría</label>
-                  <select className="select" value={form.categoria} onChange={setF('categoria')}>
-                    {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={labelStyle}>Proveedor</label>
-                  <input type="text" className="input" placeholder="Ej: Shell" value={form.proveedor} onChange={setF('proveedor')} />
-                </div>
-              </div>
-              <div>
-                <label style={labelStyle}>Chofer</label>
-                {choferes.length > 0 ? (
-                  <select className="select" value={form.chofer} onChange={setF('chofer')}>
+            <div><label style={L}>Concepto *</label>
+              <input type="text" className="input" placeholder="Ej: Nafta YPF" value={form.concepto} onChange={setF('concepto')} /></div>
+            <div className="form-grid form-grid-2">
+              <div><label style={L}>Categoría</label>
+                <select className="select" value={form.categoria} onChange={setF('categoria')}>
+                  {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select></div>
+              <div><label style={L}>Proveedor / Comercio</label>
+                <input type="text" className="input" placeholder="Ej: Shell" value={form.proveedor} onChange={setF('proveedor')} /></div>
+            </div>
+            <div><label style={L}>Chofer</label>
+              {choferes.length > 0
+                ? <select className="select" value={form.chofer} onChange={setF('chofer')}>
                     <option value="">Sin asignar</option>
                     {choferes.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                ) : (
-                  <input type="text" className="input" placeholder="Nombre del chofer" value={form.chofer} onChange={setF('chofer')} />
-                )}
-              </div>
-              <div>
-                <label style={labelStyle}>Observaciones</label>
-                <textarea className="textarea" rows={2} placeholder="Opcional…"
-                  value={form.observaciones} onChange={setF('observaciones')} />
-              </div>
-
-              {/* Comprobante + Escanear IA */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.4rem' }}>
-                  <label style={labelStyle}>Comprobante</label>
-                  <button type="button" className="btn btn-secondary"
-                    style={{ fontSize: '.75rem', padding: '.25rem .6rem' }}
-                    onClick={escanear} disabled={scanning}>
-                    {scanning
-                      ? <><span className="spinner" style={{ width: '10px', height: '10px', borderWidth: '2px' }} /> Escaneando…</>
-                      : '🤖 Escanear con IA'}
-                  </button>
-                </div>
-                <input ref={fileRef} type="file" accept="image/*,application/pdf"
-                  style={{ display: 'none' }} onChange={onArchivo} />
-                <div
-                  style={{ border: '1.5px dashed var(--border2)', borderRadius: 'var(--radius)',
-                    padding: '.75rem', textAlign: 'center', cursor: 'pointer',
-                    color: 'var(--text3)', fontSize: '.82rem' }}
-                  onClick={() => fileRef.current?.click()}>
-                  {previewUrl
-                    ? <img src={previewUrl} alt="comprobante"
-                        style={{ maxHeight: '120px', maxWidth: '100%', borderRadius: 'var(--radius)', objectFit: 'contain' }} />
-                    : '📎 Clic para adjuntar imagen o PDF'}
-                </div>
-                {archivo && (
-                  <p style={{ fontSize: '.75rem', color: 'var(--text3)', marginTop: '.3rem' }}>{archivo.name}</p>
-                )}
-              </div>
+                : <input type="text" className="input" placeholder="Nombre del chofer"
+                    value={form.chofer} onChange={setF('chofer')} />}
             </div>
+            <div><label style={L}>Observaciones</label>
+              <textarea className="textarea" rows={2} placeholder="Opcional…"
+                value={form.observaciones} onChange={setF('observaciones')} /></div>
 
-            {/* Advertencia duplicado */}
-            {dupWarning && (
-              <div style={{ background: 'var(--amber-dim)', border: '1px solid var(--amber)',
-                borderRadius: 'var(--radius)', padding: '.75rem 1rem', marginTop: '1rem',
-                fontSize: '.82rem', color: 'var(--amber)' }}>
-                ⚠️ Ya existe un egreso con la misma fecha y monto. ¿Querés guardarlo igual?
-                <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem' }}>
-                  <button className="btn btn-primary" style={{ fontSize: '.78rem', padding: '.3rem .75rem' }}
-                    onClick={() => { setDupWarning(false); guardar(true); }}>Sí, guardar igual</button>
-                  <button className="btn btn-secondary" style={{ fontSize: '.78rem', padding: '.3rem .75rem' }}
-                    onClick={() => setDupWarning(false)}>Cancelar</button>
-                </div>
+            {/* Comprobante */}
+            <div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'.4rem' }}>
+                <label style={L}>Comprobante</label>
+                <button type="button" className="btn btn-primary" style={{ fontSize:'.78rem', padding:'.3rem .75rem',
+                  background:'linear-gradient(135deg,#059669,#10b981)', border:'none' }}
+                  onClick={escanear} disabled={scanning}>
+                  {scanning
+                    ? <><span className="spinner" style={{width:10,height:10,borderWidth:2}}/> Escaneando…</>
+                    : '📷 Escanear con IA'}
+                </button>
               </div>
-            )}
-
-            {msg && (
-              <p style={{ fontSize: '.82rem', color: msg.ok ? 'var(--green)' : 'var(--red)', marginTop: '.75rem' }}>
-                {msg.text}
-              </p>
-            )}
-
-            <div style={{ display: 'flex', gap: '.75rem', marginTop: '1.25rem' }}>
-              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={cerrarModal}>Cancelar</button>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => guardar(false)} disabled={saving}>
-                {saving
-                  ? <><span className="spinner" style={{ width: '12px', height: '12px', borderWidth: '2px' }} /> Guardando…</>
-                  : form.id ? 'Actualizar' : 'Guardar'}
-              </button>
+              <input ref={fileRef} type="file" accept="image/*,application/pdf"
+                style={{ display:'none' }} onChange={onArchivo} />
+              <div style={{ border:'1.5px dashed var(--border2)', borderRadius:'var(--radius)',
+                padding:'.75rem', textAlign:'center', cursor:'pointer', color:'var(--text3)', fontSize:'.82rem' }}
+                onClick={() => fileRef.current?.click()}>
+                {previewUrl
+                  ? <img src={previewUrl} alt="comprobante"
+                      style={{ maxHeight:120, maxWidth:'100%', borderRadius:'var(--radius)', objectFit:'contain' }} />
+                  : '📎 Clic para adjuntar imagen o PDF'}
+              </div>
+              {archivo && <p style={{ fontSize:'.75rem', color:'var(--text3)', marginTop:'.3rem' }}>{archivo.name}</p>}
             </div>
           </div>
+
+          {dupWarning && (
+            <div style={{ background:'var(--amber-dim)', border:'1px solid var(--amber)',
+              borderRadius:'var(--radius)', padding:'.75rem 1rem', marginTop:'1rem',
+              fontSize:'.82rem', color:'var(--amber)' }}>
+              ⚠️ Ya existe un egreso con la misma fecha y monto. ¿Querés guardarlo igual?
+              <div style={{ display:'flex', gap:'.5rem', marginTop:'.5rem' }}>
+                <button className="btn btn-primary" style={{ fontSize:'.78rem', padding:'.3rem .75rem' }}
+                  onClick={() => { setDupWarning(false); guardar(true); }}>Sí, guardar igual</button>
+                <button className="btn btn-secondary" style={{ fontSize:'.78rem', padding:'.3rem .75rem' }}
+                  onClick={() => setDupWarning(false)}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {msgCarga && (
+            <p style={{ fontSize:'.82rem', color:msgCarga.ok?'var(--green)':'var(--red)', marginTop:'.75rem' }}>
+              {msgCarga.text}
+            </p>
+          )}
+
+          <div className="btn-row" style={{ marginTop:'1.25rem' }}>
+            <button className="btn btn-primary" onClick={() => guardar(false)} disabled={saving}>
+              {saving ? <><span className="spinner" style={{width:12,height:12,borderWidth:2}}/> Guardando…</> : '✓ Guardar egreso'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => { setForm(EMPTY); setArchivo(null); setPreviewUrl(''); setMsgCarga(null); }}>
+              Limpiar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ TAB BUSCAR ═══ */}
+      {tab === 'buscar' && (
+        <div>
+          <div className="card">
+            <div className="search-row">
+              <input type="search" className="input" placeholder="Buscar en egresos…"
+                value={busqText} onChange={e => setBusqText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && setShowFiltros(false)} />
+              <button className="btn btn-secondary"
+                onClick={() => setShowFiltros(v => !v)}>
+                ⚙ Filtros{(filtroDesde||filtroHasta||filtroMontoMin||filtroMontoMax||filtroCateg||filtroChofer) ? ' ●' : ''}
+              </button>
+            </div>
+
+            {showFiltros && (
+              <div style={{ marginTop:'1rem', paddingTop:'1rem', borderTop:'1px solid var(--border)' }}>
+                <div className="form-grid form-grid-2">
+                  <div><label style={L}>Desde</label>
+                    <input type="date" className="input" value={filtroDesde} onChange={e => setFiltroDesde(e.target.value)} /></div>
+                  <div><label style={L}>Hasta</label>
+                    <input type="date" className="input" value={filtroHasta} onChange={e => setFiltroHasta(e.target.value)} /></div>
+                  <div><label style={L}>Monto mín ($)</label>
+                    <input type="number" className="input" placeholder="0"
+                      value={filtroMontoMin} onChange={e => setFiltroMontoMin(e.target.value)} /></div>
+                  <div><label style={L}>Monto máx ($)</label>
+                    <input type="number" className="input" placeholder="Sin límite"
+                      value={filtroMontoMax} onChange={e => setFiltroMontoMax(e.target.value)} /></div>
+                </div>
+                <div style={{ marginTop:8 }}><label style={L}>Categoría</label>
+                  <select className="select" style={{ width:'100%' }} value={filtroCateg} onChange={e => setFiltroCateg(e.target.value)}>
+                    <option value="">Todas</option>
+                    {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div style={{ marginTop:8 }}><label style={L}>Chofer</label>
+                  <select className="select" style={{ width:'100%' }} value={filtroChofer} onChange={e => setFiltroChofer(e.target.value)}>
+                    <option value="">Todos los choferes</option>
+                    {choferes.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="btn-row" style={{ marginTop:10 }}>
+                  <button className="btn btn-secondary btn-sm" onClick={limpiarFiltros}>Limpiar filtros</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {loading ? (
+            <div style={{ display:'flex', alignItems:'center', gap:'.75rem', color:'var(--text3)', padding:'2rem 0' }}>
+              <span className="spinner"/> Cargando egresos…
+            </div>
+          ) : (
+            <>
+              <p style={{ fontSize:'.8rem', color:'var(--text3)', margin:'.5rem 0' }}>
+                {filtrados.length} registro{filtrados.length!==1?'s':''} ·{' '}
+                <strong style={{ color:'var(--red)' }}>{fmt(total)}</strong>
+              </p>
+
+              {filtrados.length === 0 ? (
+                <div className="empty-state"><div className="empty-icon">💸</div><p>Sin egresos encontrados.</p></div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:'.4rem' }}>
+                  {filtrados.map(e => (
+                    <div key={e.id} className="result-item">
+                      <div className="result-body" style={{ flex:1 }}>
+                        <div className="result-name" style={{ display:'flex', justifyContent:'space-between' }}>
+                          <span>{e.concepto || e.proveedor || 'Egreso'}</span>
+                          <span style={{ fontWeight:700, color:'var(--red)', fontSize:'.95rem' }}>{fmt(e.monto)}</span>
+                        </div>
+                        <div className="result-meta">
+                          {e.fecha      && <span>{e.fecha}</span>}
+                          {e.categoria  && <span className="badge badge-amber" style={{fontSize:'.68rem'}}>{e.categoria}</span>}
+                          {e.proveedor  && <span>{e.proveedor}</span>}
+                          {e.chofer     && <span>🚗 {e.chofer}</span>}
+                          {e.observaciones && <span>{e.observaciones}</span>}
+                        </div>
+                        {e.comprobante && (
+                          <img src={e.comprobante} alt="comprobante"
+                            style={{ marginTop:6, maxHeight:56, maxWidth:80, borderRadius:4, border:'1px solid var(--border)', objectFit:'cover' }}
+                            onError={ev => (ev.currentTarget.style.display='none')} />
+                        )}
+                      </div>
+                      <div className="result-actions" style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        <button className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            setForm({ id:e.id, fecha:e.fecha, concepto:e.concepto, monto:String(e.monto),
+                              categoria:e.categoria, proveedor:e.proveedor, chofer:e.chofer, observaciones:e.observaciones });
+                            setPreviewUrl(e.comprobante||''); setArchivo(null); setTab('carga');
+                          }}>✏ Editar</button>
+                        {confirmDelete === e.id ? (
+                          <div style={{ display:'flex', gap:2 }}>
+                            <button className="btn btn-danger btn-sm" onClick={() => eliminar(e.id)}>✓</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setConfirmDelete(null)}>✕</button>
+                          </div>
+                        ) : (
+                          <button className="btn btn-secondary btn-sm" onClick={() => setConfirmDelete(e.id)}>🗑</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ═══ TAB STATS ═══ */}
+      {tab === 'stats' && (
+        <div>
+          <div className="card" style={{ marginBottom:'.75rem' }}>
+            <div className="dj-controls">
+              <div className="form-group" style={{ flex:'0 0 auto' }}>
+                <label style={L}>Mes</label>
+                <select className="select" value={statsMes} onChange={e => setStatsMes(Number(e.target.value))}>
+                  {MESES.map((m,i) => <option key={i} value={i}>{m}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ flex:'0 0 auto' }}>
+                <label style={L}>Año</label>
+                <input type="number" className="input" style={{ width:90 }}
+                  value={statsAnio} onChange={e => setStatsAnio(Number(e.target.value))} />
+              </div>
+            </div>
+          </div>
+
+          {loading ? (
+            <div style={{ display:'flex', alignItems:'center', gap:'.75rem', color:'var(--text3)', padding:'2rem 0' }}>
+              <span className="spinner"/> Cargando…
+            </div>
+          ) : (
+            <>
+              {/* Resumen */}
+              <div className="tablero" style={{ gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', marginBottom:'1.25rem' }}>
+                <div className="tablero-card red">
+                  <div className="tablero-label">Total del mes</div>
+                  <div className="tablero-value">{fmt(totalMes)}</div>
+                  <div className="tablero-sub">{egresosDelMes.length} egresos</div>
+                </div>
+                {porCategoria.slice(0,3).map(c => (
+                  <div key={c.cat} className="tablero-card amber">
+                    <div className="tablero-label">{c.cat}</div>
+                    <div className="tablero-value">{fmt(c.total)}</div>
+                    <div className="tablero-sub">{c.count} registro{c.count!==1?'s':''}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Gráfico de barras por categoría */}
+              {porCategoria.length === 0 ? (
+                <div className="empty-state"><div className="empty-icon">📊</div>
+                  <p>Sin egresos para {MESES[statsMes]} {statsAnio}</p></div>
+              ) : (
+                <div className="card">
+                  <div className="card-title">Por categoría — {MESES[statsMes]} {statsAnio}</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:'.6rem', marginTop:'.5rem' }}>
+                    {porCategoria.map(c => (
+                      <div key={c.cat}>
+                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:'.82rem', marginBottom:3 }}>
+                          <span style={{ color:'var(--text2)', fontWeight:500 }}>{c.cat}</span>
+                          <span style={{ color:'var(--text)', fontWeight:700 }}>{fmt(c.total)}</span>
+                        </div>
+                        <div style={{ height:8, background:'var(--bg4)', borderRadius:4, overflow:'hidden' }}>
+                          <div style={{
+                            height:'100%', borderRadius:4,
+                            background: CATEG_COLORS[c.cat] || 'var(--blue)',
+                            width: `${(c.total / maxCateg) * 100}%`,
+                            transition: 'width .4s ease',
+                          }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Tabla de choferes */}
+              {(() => {
+                const porChofer = [...new Set(egresosDelMes.map(e => e.chofer).filter(Boolean))]
+                  .map(ch => ({ chofer: ch, total: egresosDelMes.filter(e => e.chofer === ch).reduce((s,e)=>s+e.monto,0), count: egresosDelMes.filter(e=>e.chofer===ch).length }))
+                  .sort((a,b) => b.total - a.total);
+                if (!porChofer.length) return null;
+                return (
+                  <div className="card" style={{ marginTop:'.75rem' }}>
+                    <div className="card-title">Por chofer — {MESES[statsMes]} {statsAnio}</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:'.4rem', marginTop:'.5rem' }}>
+                      {porChofer.map(c => (
+                        <div key={c.chofer} style={{ display:'flex', justifyContent:'space-between',
+                          alignItems:'center', padding:'6px 0', borderBottom:'1px solid var(--border)' }}>
+                          <span style={{ fontSize:'.88rem', color:'var(--text2)' }}>🚗 {c.chofer}</span>
+                          <span style={{ fontSize:'.88rem', fontWeight:700, color:'var(--red)' }}>{fmt(c.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </>
+          )}
         </div>
       )}
     </div>
