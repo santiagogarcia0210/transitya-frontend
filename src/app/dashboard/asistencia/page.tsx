@@ -277,57 +277,150 @@ export default function AsistenciaPage() {
   }, []);
 
   /* ═══════════════════════════════════════════════════════════════════════
-     TAB 5 — ASIGNACIÓN (admin)
+     TAB 5 — ASIGNACIÓN DIARIA (admin) — idéntico al GAS ASISTENCIA_DIARIA
      ═══════════════════════════════════════════════════════════════════════ */
-  const [asigBenefs,  setAsigBenefs]  = useState<BenefSimple[]>([]);
-  /** { nombre: email } para el select — valor = email del chofer */
-  const [asigChsMap,  setAsigChsMap]  = useState<{nombre:string;email:string}[]>([]);
-  /** { nombre_beneficiario: email_chofer } */
-  const [asigCambios, setAsigCambios] = useState<Record<string,string>>({});
-  const [loadingAsig, setLoadingAsig] = useState(false);
-  const [savingAsig,  setSavingAsig]  = useState(false);
-  const [msgAsig,     setMsgAsig]     = useState<{text:string;ok:boolean}|null>(null);
 
-  const cargarAsig = useCallback(async () => {
-    setLoadingAsig(true);
+  // Lista completa de choferes y beneficiarios
+  const [dChoferes,  setDChoferes]  = useState<{ id:string; nombre:string; vehiculo?:string }[]>([]);
+  const [dTodosB,    setDTodosB]    = useState<{ id:string; nombre:string; domicilio?:string; horarioTurno?:string }[]>([]);
+  // Asignaciones del día: { choferId → [beneficiario] }
+  const [dAsig,      setDAsig]      = useState<Record<string, { id:string; nombre:string; domicilio?:string; horarioTurno?:string; ordenVisita?:number }[]>>({});
+  const [dFecha,     setDFecha]     = useState(toISO(new Date()));
+  const [dLoading,   setDLoading]   = useState(false);
+  const [dSaving,    setDSaving]    = useState<Record<string,boolean>>({});
+  const [dOptim,     setDOptim]     = useState<Record<string,boolean>>({});
+  const [dMsg,       setDMsg]       = useState<Record<string,{text:string;ok:boolean}>>({});
+  // Buscador por chofer: { choferId → término }
+  const [dBusq,      setDBusq]      = useState<Record<string,string>>({});
+
+  const cargarDiaria = useCallback(async (fecha: string) => {
+    setDLoading(true);
     try {
-      const [bRes, uRes] = await Promise.allSettled([
+      const [bRes, uRes, aRes] = await Promise.allSettled([
         api.get('/api/beneficiarios'),
-        api.get('/api/usuarios?rol=chofer'),
+        api.get('/api/usuarios'),
+        api.get(`/api/asistencia/diaria?fecha=${fecha}`),
       ]);
-      if (bRes.status === 'fulfilled')
-        setAsigBenefs(toArray(bRes.value.data).map(serializarFirestore).map((b: Record<string,unknown>) => ({
-          id:     String(b.id     || ''),
-          nombre: String(b.nombre || b['APELLIDO Y NOMBRE'] || ''),
-          chofer: String(b.chofer || b.CHOFER || ''),
-        })));
-      if (uRes.status === 'fulfilled')
-        setAsigChsMap(
-          toArray(uRes.value.data).map(serializarFirestore)
+
+      // Beneficiarios
+      const benefs = bRes.status === 'fulfilled'
+        ? toArray(bRes.value.data).map(serializarFirestore).map((b: Record<string,unknown>) => ({
+            id:           String(b.id || b['ID'] || ''),
+            nombre:       String(b.nombre || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
+            domicilio:    String(b.domicilio || b.DOMICILIO || ''),
+            horarioTurno: String(b.horarioTurno || b.HORARIO_TURNO || b['HORARIO TURNO'] || ''),
+          })).filter(b => b.id && b.nombre)
+        : [];
+      setDTodosB(benefs);
+
+      // Choferes (usuarios con rol=chofer)
+      const chs = uRes.status === 'fulfilled'
+        ? toArray(uRes.value.data).map(serializarFirestore)
             .filter((u: Record<string,unknown>) => String(u.rol || '').toLowerCase() === 'chofer')
             .map((u: Record<string,unknown>) => ({
-              nombre: String(u.nombre || u.usuario || ''),
-              email:  String(u.email  || u.EMAIL   || ''),
-            }))
-            .filter(c => c.nombre)
-        );
+              id:       String(u.id || u.uid || ''),
+              nombre:   String(u.nombre || u.usuario || ''),
+              vehiculo: String(u.vehiculo || ''),
+            })).filter(c => c.id && c.nombre)
+        : [];
+      setDChoferes(chs);
+
+      // Asignaciones del día (colección ASISTENCIA)
+      const asigInicial: typeof dAsig = {};
+      chs.forEach(c => { asigInicial[c.id] = []; });
+      if (aRes.status === 'fulfilled') {
+        const asigs: { choferId:string; beneficiarios:unknown[] }[] = aRes.value.data?.asignaciones ?? [];
+        asigs.forEach(a => {
+          if (a.choferId && asigInicial.hasOwnProperty(a.choferId)) {
+            asigInicial[a.choferId] = (a.beneficiarios || []).map((b: unknown) => {
+              const br = b as Record<string,unknown>;
+              return {
+                id:           String(br.id || ''),
+                nombre:       String(br.nombre || ''),
+                domicilio:    String(br.domicilio || ''),
+                horarioTurno: String(br.horarioTurno || ''),
+                ordenVisita:  Number(br.ordenVisita || 0),
+              };
+            });
+          }
+        });
+      }
+      setDAsig(asigInicial);
     } catch { /* silent */ }
-    setLoadingAsig(false);
+    setDLoading(false);
   }, []);
 
-  useEffect(() => { if (tab === 'asignacion' && esAdmin) cargarAsig(); }, [tab, esAdmin, cargarAsig]);
+  useEffect(() => { if (tab === 'asignacion' && esAdmin) cargarDiaria(dFecha); }, [tab, esAdmin, dFecha, cargarDiaria]);
 
-  const guardarAsig = async () => {
-    setSavingAsig(true); setMsgAsig(null);
-    // Body: { asignaciones: { "nombre beneficiario": "email chofer" } }
+  // IDs ya asignados a cualquier chofer ese día
+  const dAsignadosIds = new Set(Object.values(dAsig).flat().map(b => b.id));
+
+  // Agregar beneficiario a un chofer
+  const dAgregar = (choferId: string, benef: { id:string; nombre:string; domicilio?:string; horarioTurno?:string }) => {
+    if (dAsignadosIds.has(benef.id)) return; // ya asignado
+    setDAsig(prev => ({ ...prev, [choferId]: [...(prev[choferId] || []), benef] }));
+    setDBusq(p => ({ ...p, [choferId]: '' }));
+  };
+
+  // Quitar beneficiario de un chofer
+  const dQuitar = (choferId: string, benefId: string) => {
+    setDAsig(prev => ({ ...prev, [choferId]: prev[choferId].filter(b => b.id !== benefId) }));
+  };
+
+  // Guardar asignación de un chofer para el día
+  const dGuardar = async (chofer: { id:string; nombre:string }) => {
+    setDSaving(p => ({ ...p, [chofer.id]: true }));
+    setDMsg(p => ({ ...p, [chofer.id]: { text:'', ok:true } }));
     try {
-      await api.put('/api/asistencia/asignaciones', { asignaciones: asigCambios });
-      const n = Object.keys(asigCambios).length;
-      setMsgAsig({ text: `✓ ${n} asignación${n!==1?'es':''} guardada${n!==1?'s':''}`, ok: true });
-      setAsigCambios({});
-      cargarAsig();
-    } catch { setMsgAsig({ text: 'Error al guardar', ok: false }); }
-    setSavingAsig(false);
+      await api.post('/api/asistencia/diaria', {
+        fecha:        dFecha,
+        choferId:     chofer.id,
+        choferNombre: chofer.nombre,
+        beneficiarios: dAsig[chofer.id] || [],
+      });
+      setDMsg(p => ({ ...p, [chofer.id]: { text: `✓ Guardado (${(dAsig[chofer.id]||[]).length} pacientes)`, ok:true } }));
+    } catch {
+      setDMsg(p => ({ ...p, [chofer.id]: { text: 'Error al guardar', ok:false } }));
+    }
+    setDSaving(p => ({ ...p, [chofer.id]: false }));
+  };
+
+  // Optimizar orden con IA
+  const dOptimizar = async (chofer: { id:string; nombre:string }) => {
+    const lista = dAsig[chofer.id] || [];
+    if (!lista.length) return;
+    setDOptim(p => ({ ...p, [chofer.id]: true }));
+    setDMsg(p => ({ ...p, [chofer.id]: { text:'🤖 Consultando IA…', ok:true } }));
+    try {
+      const r = await api.post('/api/asistencia/optimizar', {
+        choferId:     chofer.id,
+        choferNombre: chofer.nombre,
+        beneficiarios: lista,
+      });
+      const { paradas, fuente } = r.data;
+      if (paradas?.length) {
+        const ordered = paradas
+          .sort((a: {ordenVisita:number}, b: {ordenVisita:number}) => a.ordenVisita - b.ordenVisita)
+          .map((p: {beneficiarioId:string; nombre:string; domicilio:string; horarioTurno:string; ordenVisita:number}) => ({
+            id:           p.beneficiarioId,
+            nombre:       p.nombre,
+            domicilio:    p.domicilio,
+            horarioTurno: p.horarioTurno,
+            ordenVisita:  p.ordenVisita,
+          }));
+        setDAsig(prev => ({ ...prev, [chofer.id]: ordered }));
+        setDMsg(p => ({
+          ...p,
+          [chofer.id]: {
+            text: fuente === 'ia' ? '🤖 Orden optimizado por IA' : `⚡ Orden por horario (${r.data.razonFallback || 'fallback'})`,
+            ok: true,
+          },
+        }));
+      }
+    } catch {
+      setDMsg(p => ({ ...p, [chofer.id]: { text:'Error al optimizar', ok:false } }));
+    }
+    setDOptim(p => ({ ...p, [chofer.id]: false }));
   };
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -718,71 +811,160 @@ export default function AsistenciaPage() {
         </div>
       )}
 
-      {/* ── TAB: ASIGNACIÓN (admin) ───────────────────────────────────── */}
+      {/* ── TAB: ASIGNACIÓN DIARIA (admin) — idéntico al GAS ────────── */}
       {tab === 'asignacion' && esAdmin && (
         <div>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem' }}>
-            <p style={{ fontSize:'.85rem', color:'var(--text3)' }}>
-              Asigná un chofer a cada beneficiario. Los cambios se guardan en bloque.
-            </p>
-            <div style={{ display:'flex', gap:'.5rem', alignItems:'center' }}>
-              {Object.keys(asigCambios).length > 0 && (
-                <span style={{ fontSize:'.78rem', color:'var(--amber)' }}>{Object.keys(asigCambios).length} cambio{Object.keys(asigCambios).length!==1?'s':''} sin guardar</span>
-              )}
-              <button className="btn btn-primary" onClick={guardarAsig}
-                disabled={savingAsig || Object.keys(asigCambios).length === 0}>
-                {savingAsig ? <><span className="spinner" style={{width:12,height:12}}/> Guardando…</> : '💾 Guardar cambios'}
-              </button>
+          {/* Selector de fecha */}
+          <div style={{ display:'flex', gap:'1rem', alignItems:'flex-end', marginBottom:'1.25rem', flexWrap:'wrap' }}>
+            <div>
+              <label style={L}>Fecha de asignación</label>
+              <input type="date" className="input" style={{ width:160 }}
+                value={dFecha} onChange={e => setDFecha(e.target.value)} />
             </div>
+            <button className="btn btn-secondary" onClick={() => cargarDiaria(dFecha)} disabled={dLoading}>↻ Recargar</button>
+            <span style={{ fontSize:'.82rem', color:'var(--text3)', alignSelf:'center' }}>
+              {dTodosB.length} beneficiarios · {dChoferes.length} choferes
+            </span>
           </div>
 
-          {msgAsig && (
-            <p style={{ fontSize:'.82rem', color: msgAsig.ok ? 'var(--green)' : 'var(--red)', marginBottom:'.75rem' }}>{msgAsig.text}</p>
-          )}
-
-          {loadingAsig ? (
-            <div style={{ display:'flex', alignItems:'center', gap:'.75rem', color:'var(--text3)', padding:'2rem' }}><span className="spinner"/> Cargando…</div>
-          ) : asigBenefs.length === 0 ? (
-            <div className="empty-state"><div className="empty-icon">👥</div><p>Sin beneficiarios</p></div>
+          {dLoading ? (
+            <div style={{ display:'flex', alignItems:'center', gap:'.75rem', color:'var(--text3)', padding:'2rem' }}>
+              <span className="spinner"/> Cargando…
+            </div>
+          ) : dChoferes.length === 0 ? (
+            <div className="empty-state"><div className="empty-icon">🚐</div><p>Sin choferes registrados</p></div>
           ) : (
-            <div className="tabla-wrap">
-              <table className="tabla">
-                <thead>
-                  <tr>
-                    <th>Beneficiario</th>
-                    <th>Chofer actual</th>
-                    <th>Nuevo chofer</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {asigBenefs.map(b => {
-                    // key = nombre beneficiario, value = email chofer
-                    const currentEmail = asigCambios[b.nombre] ?? asigChsMap.find(c=>c.nombre===b.chofer)?.email ?? '';
-                    const changed = b.nombre in asigCambios;
-                    return (
-                      <tr key={b.id} style={{ background: changed ? 'rgba(59,130,246,.07)' : undefined }}>
-                        <td style={{ fontWeight:500, color:'var(--text)' }}>{b.nombre}</td>
-                        <td style={{ color:'var(--text3)' }}>{b.chofer || '—'}</td>
-                        <td>
-                          <select className="select" style={{ fontSize:'.82rem', padding:'.25rem .5rem' }}
-                            value={currentEmail}
-                            onChange={e => setAsigCambios(p => {
-                              const next = { ...p };
-                              const origEmail = asigChsMap.find(c=>c.nombre===b.chofer)?.email ?? '';
-                              if (e.target.value === origEmail) delete next[b.nombre];
-                              else next[b.nombre] = e.target.value;
-                              return next;
-                            })}>
-                            <option value="">Sin asignar</option>
-                            {asigChsMap.map(c => <option key={c.email} value={c.email}>{c.nombre}</option>)}
-                          </select>
-                          {changed && <span style={{ fontSize:'.68rem', color:'var(--blue)', marginLeft:'.4rem' }}>✎ modificado</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div style={{ display:'flex', flexDirection:'column', gap:'1.25rem' }}>
+              {dChoferes.map(chofer => {
+                const asignados  = dAsig[chofer.id] || [];
+                const disponibles = dTodosB.filter(b =>
+                  !dAsignadosIds.has(b.id) || asignados.some(a => a.id === b.id)
+                );
+                const busq = dBusq[chofer.id] || '';
+                const filtradosBusq = disponibles.filter(b =>
+                  !asignados.some(a => a.id === b.id) &&
+                  (!busq || b.nombre.toLowerCase().includes(busq.toLowerCase()) ||
+                            (b.domicilio || '').toLowerCase().includes(busq.toLowerCase()))
+                );
+                const msg = dMsg[chofer.id];
+
+                return (
+                  <div key={chofer.id} className="card" style={{ padding:'1rem 1.1rem' }}>
+                    {/* Cabecera chofer */}
+                    <div style={{ display:'flex', alignItems:'center', gap:'.75rem', marginBottom:'.85rem', flexWrap:'wrap' }}>
+                      <div>
+                        <span style={{ fontWeight:700, fontSize:'.95rem', color:'var(--text)' }}>
+                          🚐 {chofer.nombre}
+                        </span>
+                        {chofer.vehiculo && (
+                          <span style={{ fontSize:'.75rem', color:'var(--text3)', marginLeft:'.5rem' }}>{chofer.vehiculo}</span>
+                        )}
+                      </div>
+                      <span className="badge badge-blue" style={{ fontSize:'.72rem' }}>
+                        {asignados.length} pacientes
+                      </span>
+                      <div style={{ marginLeft:'auto', display:'flex', gap:'.5rem', flexWrap:'wrap' }}>
+                        <button className="btn btn-secondary btn-sm"
+                          disabled={!asignados.length || dOptim[chofer.id]}
+                          onClick={() => dOptimizar(chofer)}
+                          title="Optimiza el orden de paradas con IA según domicilio y horario de turno">
+                          {dOptim[chofer.id]
+                            ? <><span className="spinner" style={{width:10,height:10}}/> IA…</>
+                            : '🤖 Optimizar orden'}
+                        </button>
+                        <button className="btn btn-primary btn-sm"
+                          disabled={dSaving[chofer.id]}
+                          onClick={() => dGuardar(chofer)}>
+                          {dSaving[chofer.id]
+                            ? <><span className="spinner" style={{width:10,height:10}}/> Guardando…</>
+                            : '💾 Guardar'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {msg?.text && (
+                      <p style={{ fontSize:'.78rem', color: msg.ok ? 'var(--green)' : 'var(--red)', marginBottom:'.5rem' }}>
+                        {msg.text}
+                      </p>
+                    )}
+
+                    {/* Beneficiarios asignados */}
+                    {asignados.length > 0 ? (
+                      <div style={{ display:'flex', flexDirection:'column', gap:'.3rem', marginBottom:'.75rem' }}>
+                        {asignados.map((b, idx) => (
+                          <div key={b.id} style={{
+                            display:'flex', alignItems:'center', gap:'.6rem',
+                            padding:'.45rem .75rem', background:'var(--bg4)',
+                            borderRadius:'var(--radius)', borderLeft:'3px solid var(--blue)',
+                          }}>
+                            <span style={{ fontSize:'.75rem', color:'var(--text3)', minWidth:18, textAlign:'center', fontWeight:600 }}>
+                              {b.ordenVisita || idx + 1}
+                            </span>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <p style={{ fontSize:'.85rem', fontWeight:500, color:'var(--text)',
+                                overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                                {b.nombre}
+                              </p>
+                              {(b.domicilio || b.horarioTurno) && (
+                                <p style={{ fontSize:'.72rem', color:'var(--text3)' }}>
+                                  {b.domicilio}{b.horarioTurno ? ` · 🕐 ${b.horarioTurno}` : ''}
+                                </p>
+                              )}
+                            </div>
+                            <button style={{ background:'none', border:'none', cursor:'pointer',
+                              color:'var(--text3)', fontSize:'1rem', padding:'0 .2rem', lineHeight:1 }}
+                              onClick={() => dQuitar(chofer.id, b.id)}
+                              title="Quitar">✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{ fontSize:'.82rem', color:'var(--text3)', marginBottom:'.75rem', fontStyle:'italic' }}>
+                        Sin pacientes asignados para este día
+                      </p>
+                    )}
+
+                    {/* Buscador / selector para agregar */}
+                    <div style={{ display:'flex', gap:'.5rem', flexWrap:'wrap', alignItems:'flex-start' }}>
+                      <div style={{ flex:1, minWidth:200, position:'relative' }}>
+                        <input className="input" style={{ fontSize:'.82rem' }}
+                          placeholder="Buscar y agregar beneficiario…"
+                          value={busq}
+                          onChange={e => setDBusq(p => ({ ...p, [chofer.id]: e.target.value }))} />
+                        {busq && filtradosBusq.length > 0 && (
+                          <div style={{
+                            position:'absolute', top:'100%', left:0, right:0, zIndex:20,
+                            background:'var(--bg3)', border:'1px solid var(--border)',
+                            borderRadius:'var(--radius)', boxShadow:'0 8px 24px rgba(0,0,0,.3)',
+                            maxHeight:200, overflowY:'auto',
+                          }}>
+                            {filtradosBusq.slice(0,10).map(b => (
+                              <div key={b.id}
+                                style={{ padding:'.55rem .85rem', cursor:'pointer',
+                                  borderBottom:'1px solid var(--border)', transition:'background .1s' }}
+                                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background='var(--bg4)'}
+                                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='transparent'}
+                                onClick={() => dAgregar(chofer.id, b)}>
+                                <p style={{ fontSize:'.85rem', fontWeight:500, color:'var(--text)' }}>{b.nombre}</p>
+                                {(b.domicilio || b.horarioTurno) && (
+                                  <p style={{ fontSize:'.72rem', color:'var(--text3)' }}>
+                                    {b.domicilio}{b.horarioTurno ? ` · 🕐 ${b.horarioTurno}` : ''}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {busq && filtradosBusq.length === 0 && (
+                          <p style={{ fontSize:'.75rem', color:'var(--text3)', marginTop:'.3rem' }}>
+                            Sin resultados{dAsignadosIds.has(busq) ? ' (ya asignado a otro chofer)' : ''}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
