@@ -1,5 +1,5 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -7,6 +7,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
+import MiEmpresaModal from '@/components/MiEmpresaModal';
 
 /* ── Módulos ─────────────────────────────────────────────────────────── */
 
@@ -62,6 +63,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
   const { tipo, loading: tipoLoading } = useEmpresaTipo();
+  const [showEmpresa, setShowEmpresa] = useState(false);
 
   /**
    * Armamos la lista de links:
@@ -80,6 +82,7 @@ export default function Sidebar() {
   };
 
   return (
+    <>
     <aside style={{
       width: '220px', minHeight: '100vh', flexShrink: 0,
       background: 'var(--bg2)', borderRight: '1px solid var(--border)',
@@ -177,8 +180,28 @@ export default function Sidebar() {
         )}
       </nav>
 
-      {/* Logout */}
-      <div style={{ padding: '.75rem 1rem', borderTop: '1px solid var(--border)' }}>
+      {/* Mi empresa + Logout */}
+      <div style={{ padding: '.75rem 1rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+        <button
+          onClick={() => setShowEmpresa(true)}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: '.6rem',
+            padding: '.45rem .75rem', borderRadius: 'var(--radius)',
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: '.82rem', color: 'var(--text3)', textAlign: 'left',
+            transition: 'all 150ms ease',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)';
+            (e.currentTarget as HTMLButtonElement).style.background = 'var(--bg4)';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text3)';
+            (e.currentTarget as HTMLButtonElement).style.background = 'none';
+          }}
+        >
+          <span>🏢</span> Mi empresa
+        </button>
         <button
           onClick={handleLogout}
           style={{
@@ -201,5 +224,8 @@ export default function Sidebar() {
         </button>
       </div>
     </aside>
+
+    {showEmpresa && <MiEmpresaModal onClose={() => setShowEmpresa(false)} />}
+  </>
   );
 }

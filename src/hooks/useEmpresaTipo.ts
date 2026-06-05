@@ -6,6 +6,11 @@ import api from '@/lib/api';
 let _cached: string | null = null;
 let _promise: Promise<string> | null = null;
 
+export function invalidateEmpresaTipoCache() {
+  _cached  = null;
+  _promise = null;
+}
+
 export function useEmpresaTipo() {
   const [tipo,    setTipo]    = useState<string | null>(_cached);
   const [loading, setLoading] = useState(_cached === null);
