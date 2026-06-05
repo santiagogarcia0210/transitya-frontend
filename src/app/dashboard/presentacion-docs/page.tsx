@@ -48,11 +48,21 @@ const DOCS_LIST = [
   'Hoja de ruta',
 ];
 
-function ReciboPresDoc({ r, idx }: { r: Registro; idx: number }) {
-  const LOGO_EMPRESA = '/logos/logo-empresa.jpg';
+function ReciboPresDoc({ r, idx, logoEmpresa }: { r: Registro; idx: number; logoEmpresa?: string }) {
+  const LOGO_SRC = logoEmpresa || '/logos/logo-empresa.jpg';
   const hoy      = new Date();
   const fechaHoy = `${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
-  const [fecha, setFecha] = useState(r.fecha || fechaHoy);
+  const [fecha,      setFecha]      = useState(r.fecha || fechaHoy);
+  const [checks,     setChecks]     = useState<boolean[]>(() => DOCS_LIST.map(() => true));
+  const [firmaNombre,setFirmaNombre]= useState('');
+  const [firmaFecha, setFirmaFecha] = useState(fechaHoy);
+
+  const toggleCheck = (i: number) => setChecks(cs => cs.map((c,j) => j===i ? !c : c));
+
+  const inputPrint: React.CSSProperties = {
+    border:'none', borderBottom:'1px solid #555', fontSize:'9px',
+    fontFamily:'Arial', background:'transparent', outline:'none', width:'100%',
+  };
 
   return (
     <div className="dj-page" id={`presdoc-${idx}`}
@@ -65,7 +75,9 @@ function ReciboPresDoc({ r, idx }: { r: Registro; idx: number }) {
             <td style={{ fontSize:'10px', fontWeight:700 }}>Servicio de Traslados Programados</td>
             <td style={{ textAlign:'right', width:'80px' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={LOGO_EMPRESA} alt="Empresa" style={{ height:'60px', width:'60px', borderRadius:'50%', objectFit:'cover' }} />
+              <img src={LOGO_SRC} alt="Empresa"
+                style={{ height:'60px', width:'60px', borderRadius:'50%', objectFit:'cover' }}
+                onError={ev => { (ev.currentTarget as HTMLImageElement).style.display='none'; }} />
             </td>
           </tr>
         </tbody>
@@ -79,11 +91,8 @@ function ReciboPresDoc({ r, idx }: { r: Registro; idx: number }) {
       {/* Fecha */}
       <div style={{ textAlign:'right', fontSize:'9px', marginBottom:'10px' }}>
         FECHA: &nbsp;
-        <input
-          type="text" value={fecha}
-          onChange={e => setFecha(e.target.value)}
-          style={{ width:'80px', border:'none', borderBottom:'1px solid #555', fontSize:'9px', fontFamily:'Arial', background:'transparent', textAlign:'center' }}
-        />
+        <input type="text" value={fecha} onChange={e => setFecha(e.target.value)}
+          style={{ width:'80px', ...inputPrint, textAlign:'center' }} />
       </div>
 
       {/* Destinatario */}
@@ -99,9 +108,25 @@ function ReciboPresDoc({ r, idx }: { r: Registro; idx: number }) {
         En el dia de la fecha se hace entrega de la siguiente documentacion:
       </div>
 
-      {/* Lista de documentos */}
+      {/* Lista de documentos con checkboxes */}
       <div style={{ border:'1px solid #bbb', padding:'8px 12px', marginBottom:'10px', fontSize:'8.5px', lineHeight:1.9 }}>
-        {DOCS_LIST.map(d => <div key={d}>{d}</div>)}
+        {DOCS_LIST.map((d, i) => (
+          <div key={d} style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}
+            onClick={() => toggleCheck(i)}>
+            <span style={{
+              display:'inline-flex', alignItems:'center', justifyContent:'center',
+              width:11, height:11, flexShrink:0,
+              border:'1px solid #666', borderRadius:2,
+              background: checks[i] ? '#2563eb' : 'transparent',
+              color:'#fff', fontSize:8, fontWeight:900,
+            }}>
+              {checks[i] ? '✓' : ''}
+            </span>
+            <span style={{ textDecoration: checks[i] ? 'none' : 'line-through', color: checks[i] ? '#111' : '#aaa' }}>
+              {d}
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* Párrafo */}
@@ -111,7 +136,7 @@ function ReciboPresDoc({ r, idx }: { r: Registro; idx: number }) {
 
       {/* Datos beneficiario */}
       <div style={{ fontWeight:700, fontSize:'9px', marginBottom:'8px' }}>Datos del beneficiario:</div>
-      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'9px', marginBottom:'30px' }}>
+      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'9px', marginBottom:'24px' }}>
         <tbody>
           <tr>
             <td style={{ width:'50%', paddingRight:'10px' }}>
@@ -127,12 +152,21 @@ function ReciboPresDoc({ r, idx }: { r: Registro; idx: number }) {
       </table>
 
       {/* Firmas */}
-      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'9px' }}>
+      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'9px', marginBottom:6 }}>
         <tbody>
           <tr>
-            <td style={{ borderTop:'1px solid #999', paddingTop:'4px', width:'50%' }}>Firma y aclaracion de quien recibe</td>
-            <td style={{ width:'10%' }} />
-            <td style={{ borderTop:'1px solid #999', paddingTop:'4px', width:'40%' }}>Fecha de recepcion</td>
+            <td style={{ width:'55%', paddingRight:16 }}>
+              <div style={{ marginBottom:20 }} />
+              <div style={{ borderTop:'1px solid #999', paddingTop:4 }}>Firma y aclaracion de quien recibe</div>
+              <input type="text" value={firmaNombre} onChange={e => setFirmaNombre(e.target.value)}
+                placeholder="Nombre y apellido" style={{ ...inputPrint, marginTop:4 }} />
+            </td>
+            <td style={{ width:'45%', paddingLeft:16 }}>
+              <div style={{ marginBottom:20 }} />
+              <div style={{ borderTop:'1px solid #999', paddingTop:4 }}>Fecha de recepcion</div>
+              <input type="text" value={firmaFecha} onChange={e => setFirmaFecha(e.target.value)}
+                style={{ ...inputPrint, marginTop:4, width:'120px' }} />
+            </td>
           </tr>
         </tbody>
       </table>
@@ -144,10 +178,10 @@ function ReciboPresDoc({ r, idx }: { r: Registro; idx: number }) {
           if (!el) return;
           const win = window.open('', '_blank', 'width=900,height=700');
           if (!win) return;
-          win.document.write(`<html><head><style>body{margin:0;font-family:Arial,sans-serif;}.no-print{display:none!important;}input{border:none!important;border-bottom:1px solid #555!important;background:transparent!important;}@page{size:A4;margin:0;}</style></head><body>${el.innerHTML}</body></html>`);
+          win.document.write(`<html><head><style>body{margin:0;font-family:Arial,sans-serif;}.no-print{display:none!important;}input{border:none!important;border-bottom:1px solid #555!important;background:transparent!important;outline:none!important;}@page{size:A4;margin:0;}</style></head><body>${el.innerHTML}</body></html>`);
           win.document.close(); win.focus(); win.print(); win.close();
         }}>
-          Imprimir
+          🖨️ Imprimir este
         </button>
       </div>
     </div>
@@ -179,6 +213,7 @@ export default function PresentacionDocsPage() {
   const [lista,         setLista]         = useState<Registro[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [vistaImp,      setVistaImp]      = useState(false);  // false = lista, true = impresión
+  const [logoEmpresa,   setLogoEmpresa]   = useState('');
   const [filtroBusq,    setFiltroBusq]    = useState('');
   const [showModal,     setShowModal]     = useState(false);
   const [form,          setForm]          = useState<FormState>(EMPTY);
@@ -201,7 +236,13 @@ export default function PresentacionDocsPage() {
   };
 
   useEffect(() => {
-    if (empresaTipo === 'transporte_escolar' || empresaTipo === 'transporte_especial') cargar();
+    if (empresaTipo === 'transporte_escolar' || empresaTipo === 'transporte_especial') {
+      cargar();
+      api.get('/api/dashboard').then(r => {
+        const logo = r.data?.empresaLogo || r.data?.tablero?.empresaLogo || '';
+        if (logo) setLogoEmpresa(logo);
+      }).catch(() => {});
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empresaTipo]);
 
@@ -284,7 +325,7 @@ export default function PresentacionDocsPage() {
             {filtrados.map((r, i) => (
               <div key={r.id}>
                 {i > 0 && <hr style={{ border:'none', borderTop:'2px dashed var(--border2)', margin:'20px 0' }} className="no-print" />}
-                <ReciboPresDoc r={r} idx={i} />
+                <ReciboPresDoc r={r} idx={i} logoEmpresa={logoEmpresa} />
               </div>
             ))}
           </div>
