@@ -30,7 +30,6 @@ const UNIVERSAL: LinkItem[] = [
 const ESCOLAR_EXTRAS: LinkItem[] = [
   { href: '/dashboard/planilla-incluir',  label: '📝 Planilla Incluir' },
   { href: '/dashboard/dj-esc107',         label: '📄 DJ — ESC 107' },
-  { href: '/dashboard/altas-pres',        label: '📋 Altas (PRES IS)' },
   { href: '/dashboard/cambio-transporte', label: '🔄 Cambio Transporte' },
   { href: '/dashboard/presentacion-docs', label: '📁 Presentación Docs' },
   { href: '/dashboard/facturacion',       label: '💳 Facturación' },

@@ -53,7 +53,6 @@ const MODULOS: ModCard[] = [
   { href:'/dashboard/planilla-incluir',   icon:'📝', nombre:'Planilla Incluir',   desc:'Planilla de asistencia mensual', tipos:['transporte_escolar'] },
   { href:'/dashboard/dj-esc107',          icon:'📄', nombre:'DJ ESC 107',         desc:'Declaración jurada ANDIS', tipos:['transporte_escolar'] },
   { href:'/dashboard/cambio-transporte',  icon:'🔄', nombre:'Cambio Transporte',  desc:'Notas de cambio de prestador', tipos:['transporte_escolar'] },
-  { href:'/dashboard/altas-pres',         icon:'📋', nombre:'Altas PRES IS',      desc:'Inscripción de documentación', tipos:['transporte_escolar'] },
   { href:'/dashboard/presentacion-docs',  icon:'📁', nombre:'Presentación Docs',  desc:'Documentos presentados', tipos:['transporte_escolar'] },
   { href:'/dashboard/envios',             icon:'📦', nombre:'Envíos',             desc:'Gestión de paquetes', tipos:['paqueteria'] },
   { href:'/dashboard/repartidores',       icon:'🚴', nombre:'Repartidores',       desc:'Personal de reparto', tipos:['paqueteria'] },
