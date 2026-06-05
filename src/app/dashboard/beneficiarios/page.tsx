@@ -72,6 +72,7 @@ export default function BeneficiariosPage() {
   const [tab,            setTab]            = useState<TabReg>('alta');
   const [lista,          setLista]          = useState<Beneficiario[]>([]);
   const [loading,        setLoading]        = useState(true);
+  const [errLoad,        setErrLoad]        = useState<string | null>(null);
   const [choferes,       setChoferes]       = useState<string[]>([]);
 
   /* ── Tab Alta ── */
@@ -98,10 +99,11 @@ export default function BeneficiariosPage() {
 
   const cargar = useCallback(async () => {
     setLoading(true);
+    setErrLoad(null);
     try {
       const [rBen, rChof] = await Promise.all([
         api.get('/api/beneficiarios'),
-        api.get('/api/usuarios'),
+        api.get('/api/usuarios').catch(() => ({ data: [] })),
       ]);
       const raw = toArray(rBen.data)
         .map(serializarFirestore)
@@ -113,7 +115,10 @@ export default function BeneficiariosPage() {
         .map((u: Record<string,unknown>) => String(u.nombre || u.NOMBRE || ''))
         .filter(Boolean).sort();
       setChoferes(nombresChof);
-    } catch { /* silent */ }
+    } catch (err: unknown) {
+      console.error('[beneficiarios] cargar:', err);
+      setErrLoad('No se pudieron cargar los beneficiarios. Verificá tu sesión o contactá soporte.');
+    }
     setLoading(false);
   }, []);
 
@@ -371,6 +376,15 @@ export default function BeneficiariosPage() {
           📋 Base de datos
         </button>
       </div>
+
+      {/* Error de carga */}
+      {errLoad && (
+        <div style={{ background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,.3)',
+          borderRadius: 'var(--radius)', padding: '.65rem .85rem', fontSize: '.82rem',
+          color: 'var(--red)', marginBottom: '1rem' }}>
+          ⚠️ {errLoad}
+        </div>
+      )}
 
       {/* ═══ TAB ALTA ═══ */}
       {tab === 'alta' && (

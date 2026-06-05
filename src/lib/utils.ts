@@ -7,6 +7,7 @@ export function toArray(data: any): any[] {
   if (!data || typeof data !== 'object') return [];
   // Try common backend wrapper keys in priority order
   return data.registros
+      ?? data.resultados
       ?? data.ubicaciones
       ?? data.items
       ?? data.data

@@ -87,6 +87,7 @@ export default function RegistroPage() {
   const [lista,         setLista]         = useState<Beneficiario[]>([]);
   const [choferesList,  setChoferesList]  = useState<string[]>([]);
   const [loading,       setLoading]       = useState(true);
+  const [errLoad,       setErrLoad]       = useState<string | null>(null);
   const [filtroBusq,    setFiltroBusq]    = useState('');
   const [filtroChofer,  setFiltroChofer]  = useState('');
   const [showModal,     setShowModal]     = useState(false);
@@ -101,6 +102,7 @@ export default function RegistroPage() {
   /* ── Carga ────────────────────────────────────────────────────────── */
   const cargar = async () => {
     setLoading(true);
+    setErrLoad(null);
     try {
       const [regRes, choRes] = await Promise.all([
         api.get('/api/registro'),
@@ -114,7 +116,10 @@ export default function RegistroPage() {
         .filter(Boolean)
         .sort() as string[];
       setChoferesList([...new Set(chs)]);
-    } catch { /* silent */ }
+    } catch (err: unknown) {
+      console.error('[registro] cargar:', err);
+      setErrLoad('No se pudieron cargar los datos. Verificá tu sesión o contactá soporte.');
+    }
     setLoading(false);
   };
 
@@ -219,6 +224,15 @@ export default function RegistroPage() {
         </div>
         <button className="btn btn-primary" onClick={abrirNuevo}>+ Nueva alta</button>
       </div>
+
+      {/* Error de carga */}
+      {errLoad && (
+        <div style={{ background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,.3)',
+          borderRadius: 'var(--radius)', padding: '.65rem .85rem', fontSize: '.82rem',
+          color: 'var(--red)', marginBottom: '1rem' }}>
+          ⚠️ {errLoad}
+        </div>
+      )}
 
       {/* Filtros */}
       <div className="filter-bar">
