@@ -7,7 +7,7 @@ import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
 
 /* ─── Tipos ─────────────────────────────────────────────────────────── */
 
-interface ChoferEstado { nombre:string; usuario:string; vehiculo:string; tieneReporte:boolean; }
+interface ChoferEstado { nombre:string; usuario:string; vehiculo:string; tieneReporte:boolean; hace?:string; lat?:number; lng?:number; }
 interface UbicChofer  { nombre:string; vehiculo:string; lat:number; lng:number; hace:string; online:boolean; }
 interface AsistHoy    { chofer:string; presentes:number; ausentes:number; pendientes:number; total:number; }
 
@@ -18,7 +18,7 @@ interface Tablero {
   totalPagadoMes:number; totalPresentadoMes:number;
   kmMes:number; combustibleMes:number;
   estadoChoferes:ChoferEstado[]; mesNombre:string; anio:number;
-  empresaNombre:string;
+  empresaNombre:string; empresaLogo?:string;
 }
 
 interface Movimiento { id:string; tipo:'ingreso'|'egreso'; fecha:string; concepto:string; monto:number; estado:string; }
@@ -140,7 +140,8 @@ export default function DashboardPage() {
       try {
         const r = await api.get('/api/dashboard/resumen');
         const d = serializarFirestore(r.data);
-        if (d && typeof d.totalEgresosMes !== 'undefined') {
+        // Resumen ok si tiene al menos beneficiariosActivos o totalEgresosMes
+        if (d && (typeof d.beneficiariosActivos !== 'undefined' || typeof d.totalEgresosMes !== 'undefined')) {
           setTab({
             beneficiariosActivos: num(d.beneficiariosActivos),
             bajasMes:             num(d.bajasMes),
@@ -152,15 +153,19 @@ export default function DashboardPage() {
             totalPresentadoMes:   num(d.totalPresentadoMes),
             kmMes:                num(d.kmMes),
             combustibleMes:       num(d.combustibleMes),
-            estadoChoferes: toArray(d.estadoChoferes).map((c:Record<string,unknown>) => ({
+            estadoChoferes: (Array.isArray(d.estadoChoferes) ? d.estadoChoferes : []).map((c:Record<string,unknown>) => ({
               nombre:       str(c.nombre??c.NOMBRE??c.usuario??c.USUARIO??''),
               usuario:      str(c.usuario??c.USUARIO??''),
-              vehiculo:     str(c.vehiculo??c.VEHICULO??''),
+              vehiculo:     str(c.vehiculo??c.VEHICULO??c.patente??c.PATENTE??''),
               tieneReporte: Boolean(c.reporteHoy??c.reportehoy??c.tieneReporte??false),
+              hace:         str(c.hace??''),
+              lat:          c.lat ? num(c.lat) : undefined,
+              lng:          c.lng ? num(c.lng) : undefined,
             })),
             mesNombre:    str(d.mesNombre)||MESES[mes-1],
             anio:         num(d.anio)||anio,
             empresaNombre:str(d.empresaNombre??d.empresa?.nombre??''),
+            empresaLogo:  str(d.empresaLogo??d.logo??''),
           });
           resumenOk = true;
         }
@@ -218,7 +223,9 @@ export default function DashboardPage() {
   const fetchUbicaciones = async () => {
     try {
       const r = await api.get('/api/ubicaciones');
-      setUbicaciones(toArray(r.data).map(serializarFirestore).map((u:Record<string,unknown>)=>({
+      // Backend returns { ok, ubicaciones: [...] }
+      const lista = r.data?.ubicaciones ?? toArray(r.data);
+      setUbicaciones(lista.map(serializarFirestore).map((u:Record<string,unknown>)=>({
         nombre:  str(u.nombre||u.NOMBRE||u.usuario||''),
         vehiculo:str(u.vehiculo||u.VEHICULO||''),
         lat:     num(u.lat||u.LAT||0),
@@ -287,14 +294,27 @@ export default function DashboardPage() {
       {/* ── Header estilo GAS: logo empresa circular + nombre + mes/año + semáforo chips ── */}
       <div style={{ marginBottom:'1.25rem' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
-          {/* Logo empresa circular */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logos/logo-empresa.jpg"
-            alt="Empresa"
-            style={{ height:64, width:64, borderRadius:'50%', objectFit:'cover',
-              border:'3px solid var(--blue)', boxShadow:'0 0 0 6px rgba(59,130,246,0.15)' }}
-          />
+          {/* Logo empresa circular — desde Firestore o fallback iniciales */}
+          {tab.empresaLogo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={tab.empresaLogo}
+              alt="Empresa"
+              style={{ height:64, width:64, borderRadius:'50%', objectFit:'cover',
+                border:'3px solid var(--blue)', boxShadow:'0 0 0 6px rgba(59,130,246,0.15)',
+                flexShrink:0 }}
+            />
+          ) : (
+            <div style={{
+              height:64, width:64, borderRadius:'50%', flexShrink:0,
+              background:'var(--blue-dim)', border:'3px solid var(--blue)',
+              boxShadow:'0 0 0 6px rgba(59,130,246,0.15)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:'1.4rem', fontWeight:800, color:'var(--blue)',
+            }}>
+              {(tab.empresaNombre || 'T').split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() || '🚐'}
+            </div>
+          )}
           <div>
             <div style={{ fontSize:'1.15rem', fontWeight:800, color:'var(--text)', letterSpacing:'-.01em' }}>
               {tab.empresaNombre || 'TRANSPORTE FLORES'}

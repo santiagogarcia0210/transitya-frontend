@@ -124,7 +124,8 @@ export default function AltasPresPage() {
     setLoading(true);
     try {
       const r = await api.get('/api/altas-pres');
-      setLista(toArray(r.data).map(serializarFirestore).map(norm));
+      const rows = (r.data?.registros ?? toArray(r.data)) as Record<string,unknown>[];
+      setLista(rows.map(serializarFirestore).map(norm));
     } catch { /* silent */ }
     setLoading(false);
   };

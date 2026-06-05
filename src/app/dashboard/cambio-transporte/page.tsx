@@ -146,8 +146,8 @@ export default function CambioTransportePage() {
     setLoading(true);
     try {
       const r = await api.get('/api/cambio-transporte');
-      const rows = toArray(r.data).map(serializarFirestore);
-      setCartas(rows.map(normCarta));
+      const rows = (r.data?.registros ?? toArray(r.data)) as Record<string,unknown>[];
+      setCartas(rows.map(serializarFirestore).map(normCarta));
     } catch { /* silent */ }
     setLoading(false);
   };
