@@ -24,7 +24,7 @@ const DOW   = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 
 /* ─── Tipos ──────────────────────────────────────────────────────────── */
 
-type Tab = 'tomar'|'reporte'|'calendario'|'buscar'|'asignacion';
+type Tab = 'tomar'|'reporte'|'calendario'|'buscar'|'asignacion'|'admin';
 
 interface BenefHoy   { id:string; nombre:string; chofer:string; }
 interface ChoferGrupo { chofer:string; rows:{ nombre:string; presentes:number; ausentes:number; total:number }[]; }
@@ -58,7 +58,11 @@ export default function AsistenciaPage() {
 
   /* ── Tab activa ─────────────────────────────────────────────────────── */
   const [tab, setTab] = useState<Tab>('tomar');
-  const tabs = [...TABS_DEF, ...(esAdmin ? [{ key:'asignacion' as Tab, label:'👥 Asignación' }] : [])];
+  const tabs = [
+    ...TABS_DEF,
+    ...(esAdmin ? [{ key:'asignacion' as Tab, label:'👥 Asignación' }] : []),
+    ...(esAdmin ? [{ key:'admin' as Tab, label:'⚙ Admin' }] : []),
+  ];
 
   /* ═══════════════════════════════════════════════════════════════════════
      TAB 1 — TOMAR ASISTENCIA
@@ -421,6 +425,109 @@ export default function AsistenciaPage() {
       setDMsg(p => ({ ...p, [chofer.id]: { text:'Error al optimizar', ok:false } }));
     }
     setDOptim(p => ({ ...p, [chofer.id]: false }));
+  };
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     TAB 6 — ADMIN PANEL (admin only) — idéntico al GAS
+     ═══════════════════════════════════════════════════════════════════════ */
+  const [triggerEstado,     setTriggerEstado]    = useState('');
+  const [loadingTrigger,    setLoadingTrigger]   = useState(false);
+  const [alertaMontoMax,    setAlertaMontoMax]   = useState('');
+  const [alertaPctAusencia, setAlertaPctAusencia]= useState('');
+  const [alertaEmail,       setAlertaEmail]      = useState('');
+  const [alertaActivo,      setAlertaActivo]     = useState(false);
+  const [savingAlertas,     setSavingAlertas]    = useState(false);
+  const [msgAlertas,        setMsgAlertas]       = useState<{text:string;ok:boolean}|null>(null);
+  const [loadingRenovacion, setLoadingRenovacion]= useState(false);
+  const [msgRenovacion,     setMsgRenovacion]    = useState<{text:string;ok:boolean}|null>(null);
+  const [loadingWA,         setLoadingWA]        = useState(false);
+  const [msgWA,             setMsgWA]            = useState<{text:string;ok:boolean}|null>(null);
+
+  useEffect(() => {
+    if (tab !== 'admin' || !esAdmin) return;
+    // Cargar config alertas + estado trigger
+    api.get('/api/admin/alertas').then(r => {
+      const a = r.data?.alertas || {};
+      setAlertaMontoMax(String(a.montoMaxEgreso || ''));
+      setAlertaPctAusencia(String(a.pctAusenciaMax || ''));
+      setAlertaEmail(String(a.email || ''));
+      setAlertaActivo(Boolean(a.activo));
+    }).catch(() => {});
+    api.get('/api/admin/trigger-cierre').then(r => {
+      setTriggerEstado(r.data?.activo
+        ? `● Activo — última actualización: ${r.data.actualizadoEn || 'desconocida'}`
+        : '○ No configurado');
+    }).catch(() => { setTriggerEstado('○ No configurado'); });
+  }, [tab, esAdmin]);
+
+  const instalarTrigger = async () => {
+    setLoadingTrigger(true);
+    try {
+      const r = await api.post('/api/admin/trigger-cierre', {});
+      setTriggerEstado(`● Activo — ${new Date().toLocaleString('es-AR')}`);
+      setMsgAlertas({ text: r.data?.mensaje || '✓ Trigger instalado', ok: true });
+    } catch { setMsgAlertas({ text: 'Error al instalar trigger', ok: false }); }
+    setLoadingTrigger(false);
+  };
+
+  const verificarTrigger = async () => {
+    setLoadingTrigger(true);
+    try {
+      const r = await api.get('/api/admin/trigger-cierre');
+      setTriggerEstado(r.data?.activo
+        ? `● Activo — última actualización: ${r.data.actualizadoEn || 'desconocida'}`
+        : '○ No configurado');
+    } catch { setTriggerEstado('○ Error al verificar'); }
+    setLoadingTrigger(false);
+  };
+
+  const guardarAlertas = async () => {
+    setSavingAlertas(true); setMsgAlertas(null);
+    try {
+      const r = await api.post('/api/admin/alertas', {
+        montoMaxEgreso: alertaMontoMax ? Number(alertaMontoMax) : null,
+        pctAusenciaMax: alertaPctAusencia ? Number(alertaPctAusencia) : null,
+        email: alertaEmail, activo: alertaActivo,
+      });
+      setMsgAlertas({ text: r.data?.mensaje || '✓ Guardado', ok: true });
+    } catch { setMsgAlertas({ text: 'Error al guardar alertas', ok: false }); }
+    setSavingAlertas(false);
+  };
+
+  const instalarTriggerRenovacion = async () => {
+    setLoadingRenovacion(true); setMsgRenovacion(null);
+    try {
+      const r = await api.post('/api/admin/trigger-renovacion', {});
+      setMsgRenovacion({ text: r.data?.mensaje || '✓ Trigger de renovación activado', ok: true });
+    } catch { setMsgRenovacion({ text: 'Error al instalar trigger', ok: false }); }
+    setLoadingRenovacion(false);
+  };
+
+  const activarReporteDiarioWA = async () => {
+    setLoadingWA(true); setMsgWA(null);
+    try {
+      const r = await api.post('/api/admin/whatsapp-ahora', { tipo: 'activar' });
+      setMsgWA({ text: r.data?.mensaje || '✓ Activado', ok: !!r.data?.ok });
+    } catch { setMsgWA({ text: 'Error al activar', ok: false }); }
+    setLoadingWA(false);
+  };
+
+  const enviarReporteAhora = async () => {
+    setLoadingWA(true); setMsgWA(null);
+    try {
+      const r = await api.post('/api/admin/whatsapp-ahora', {});
+      setMsgWA({ text: r.data?.mensaje || '✓ Enviado', ok: !!r.data?.ok });
+    } catch { setMsgWA({ text: 'Error al enviar reporte', ok: false }); }
+    setLoadingWA(false);
+  };
+
+  const probarWA = async () => {
+    setLoadingWA(true); setMsgWA(null);
+    try {
+      const r = await api.post('/api/admin/probar-whatsapp', {});
+      setMsgWA({ text: r.data?.mensaje || '✓ Prueba enviada', ok: !!r.data?.ok });
+    } catch { setMsgWA({ text: 'Error al probar WA', ok: false }); }
+    setLoadingWA(false);
   };
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -808,6 +915,120 @@ export default function AsistenciaPage() {
           {!busqResultado && !loadingBq && busqTxt.length >= 2 && (
             <div className="empty-state"><p>Sin resultados para "{busqTxt}"</p></div>
           )}
+        </div>
+      )}
+
+      {/* ── TAB: ADMIN PANEL ──────────────────────────────────────────── */}
+      {tab === 'admin' && esAdmin && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+          {/* Cierre automático del día */}
+          <div className="card" style={{ padding: '1.25rem' }}>
+            <p style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '.5rem' }}>⚡ Cierre automático de día</p>
+            <p style={{ fontSize: '.82rem', color: 'var(--text3)', marginBottom: '.75rem', lineHeight: 1.6 }}>
+              Instala un trigger que marca ausentes automáticamente a las 20:00 todos los días hábiles.
+            </p>
+            {triggerEstado && (
+              <p style={{ fontSize: '.78rem', color: 'var(--text3)', marginBottom: '.75rem',
+                padding: '.4rem .75rem', background: 'var(--bg4)', borderRadius: 'var(--radius)' }}>
+                {triggerEstado}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" style={{ fontSize: '.82rem' }}
+                onClick={instalarTrigger} disabled={loadingTrigger}>
+                {loadingTrigger ? <><span className="spinner" style={{width:10,height:10}}/> …</> : '⚡ Instalar trigger'}
+              </button>
+              <button className="btn btn-secondary" style={{ fontSize: '.82rem' }}
+                onClick={verificarTrigger} disabled={loadingTrigger}>
+                ↻ Verificar estado
+              </button>
+            </div>
+          </div>
+
+          {/* Configuración de alertas */}
+          <div className="card" style={{ padding: '1.25rem' }}>
+            <p style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '.75rem' }}>🔔 Configuración de alertas</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem', marginBottom: '.75rem' }}>
+              <div>
+                <label style={L}>Monto máx egreso ($)</label>
+                <input type="number" className="input" placeholder="50000"
+                  value={alertaMontoMax} onChange={e => setAlertaMontoMax(e.target.value)} />
+              </div>
+              <div>
+                <label style={L}>% ausencia máx</label>
+                <input type="number" className="input" placeholder="20"
+                  value={alertaPctAusencia} onChange={e => setAlertaPctAusencia(e.target.value)} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={L}>Email destino</label>
+                <input type="email" className="input" placeholder="admin@ejemplo.com"
+                  value={alertaEmail} onChange={e => setAlertaEmail(e.target.value)} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.75rem' }}>
+              <input type="checkbox" id="alerta-activo-asist" style={{ width: 18, height: 18 }}
+                checked={alertaActivo} onChange={e => setAlertaActivo(e.target.checked)} />
+              <label htmlFor="alerta-activo-asist" style={{ fontSize: '.85rem', color: 'var(--text2)' }}>Alertas activas</label>
+            </div>
+            {msgAlertas && (
+              <p style={{ fontSize: '.78rem', color: msgAlertas.ok ? 'var(--green)' : 'var(--red)', marginBottom: '.5rem' }}>
+                {msgAlertas.text}
+              </p>
+            )}
+            <button className="btn btn-primary" style={{ fontSize: '.82rem' }}
+              onClick={guardarAlertas} disabled={savingAlertas}>
+              {savingAlertas ? <><span className="spinner" style={{width:10,height:10}}/> Guardando…</> : 'Guardar alertas'}
+            </button>
+          </div>
+
+          {/* Renovación automática de mes */}
+          <div className="card" style={{ padding: '1.25rem' }}>
+            <p style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '.5rem' }}>🔄 Renovación automática de mes</p>
+            <p style={{ fontSize: '.82rem', color: 'var(--text3)', marginBottom: '.75rem', lineHeight: 1.6 }}>
+              Instala un trigger que el 1° de cada mes genera automáticamente la planilla de asistencia del nuevo mes.
+            </p>
+            {msgRenovacion && (
+              <p style={{ fontSize: '.78rem', color: msgRenovacion.ok ? 'var(--green)' : 'var(--red)', marginBottom: '.5rem' }}>
+                {msgRenovacion.text}
+              </p>
+            )}
+            <button className="btn btn-primary" style={{ fontSize: '.82rem' }}
+              onClick={instalarTriggerRenovacion} disabled={loadingRenovacion}>
+              {loadingRenovacion ? <><span className="spinner" style={{width:10,height:10}}/> …</> : '▶ Instalar trigger renovación'}
+            </button>
+          </div>
+
+          {/* Reporte diario por WhatsApp */}
+          <div className="card" style={{ padding: '1.25rem' }}>
+            <p style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '.5rem' }}>📲 Reporte diario por WhatsApp</p>
+            <p style={{ fontSize: '.82rem', color: 'var(--text3)', marginBottom: '.75rem', lineHeight: 1.6 }}>
+              Todos los días a las 21:00 recibís un resumen por WhatsApp con los egresos del día (con total), remitos cargados y kilometraje — discriminado por chofer.
+            </p>
+            {msgWA && (
+              <p style={{ fontSize: '.78rem', color: msgWA.ok ? 'var(--green)' : 'var(--red)', marginBottom: '.5rem' }}>
+                {msgWA.text}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.5rem' }}>
+              <button className="btn btn-primary" style={{ fontSize: '.82rem' }}
+                onClick={activarReporteDiarioWA} disabled={loadingWA}>
+                {loadingWA ? <><span className="spinner" style={{width:10,height:10}}/> …</> : '⚡ Activar reporte diario WA'}
+              </button>
+              <button className="btn btn-secondary" style={{ fontSize: '.82rem' }}
+                onClick={enviarReporteAhora} disabled={loadingWA}>
+                📲 Enviar reporte ahora
+              </button>
+              <button className="btn btn-secondary" style={{ fontSize: '.82rem' }}
+                onClick={probarWA} disabled={loadingWA}>
+                🔧 Probar WA
+              </button>
+            </div>
+            <p style={{ fontSize: '.72rem', color: 'var(--text3)' }}>
+              Requiere CALLMEBOT_PHONE y CALLMEBOT_APIKEY configurados en el servidor.
+            </p>
+          </div>
+
         </div>
       )}
 
