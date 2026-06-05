@@ -284,80 +284,89 @@ export default function DashboardPage() {
   /* ─── Render ──────────────────────────────────────────────────────── */
   return (
     <div>
-      {/* Header */}
-      <div className="section-header">
-        <div>
-          <h2 className="section-title">Tablero</h2>
-          <p style={{ fontSize:'.82rem', color:'var(--text3)', marginTop:'.2rem' }}>{tab.mesNombre} {tab.anio}</p>
+      {/* ── Header estilo GAS: logo empresa circular + nombre + mes/año + semáforo chips ── */}
+      <div style={{ marginBottom:'1.25rem' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
+          {/* Logo empresa circular */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logos/logo-empresa.jpg"
+            alt="Empresa"
+            style={{ height:64, width:64, borderRadius:'50%', objectFit:'cover',
+              border:'3px solid var(--blue)', boxShadow:'0 0 0 6px rgba(59,130,246,0.15)' }}
+          />
+          <div>
+            <div style={{ fontSize:'1.15rem', fontWeight:800, color:'var(--text)', letterSpacing:'-.01em' }}>
+              {tab.empresaNombre || 'TRANSPORTE FLORES'}
+            </div>
+            <div style={{ fontSize:'.82rem', color:'var(--text3)', marginTop:'2px' }}>
+              {tab.mesNombre} {tab.anio} · Datos en tiempo real
+            </div>
+          </div>
+          <div style={{ marginLeft:'auto' }}>
+            <button className="btn btn-secondary" onClick={()=>{fetchTablero();fetchUbicaciones();fetchAsistHoy();}} style={{ fontSize:'.8rem' }}>
+              ↻ Actualizar
+            </button>
+          </div>
         </div>
-        <button className="btn btn-secondary" onClick={()=>{fetchTablero();fetchUbicaciones();fetchAsistHoy();}} style={{ fontSize:'.8rem' }}>
-          ↻ Actualizar
-        </button>
+
+        {/* Semáforo reportes KM — chips idénticos al GAS */}
+        {tab.estadoChoferes.length > 0 && (
+          <div style={{ marginTop:'12px', padding:'10px 12px', background:'var(--bg3)', borderRadius:'10px' }}>
+            <div style={{ fontSize:'11px', fontWeight:700, color:'var(--text3)', marginBottom:'8px' }}>🛣 Reporte KM hoy</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:'8px' }}>
+              {tab.estadoChoferes.map((ch,i) => (
+                <div key={ch.nombre||i} style={{
+                  display:'flex', alignItems:'center', gap:'5px',
+                  padding:'5px 10px', borderRadius:'20px',
+                  background: ch.tieneReporte ? 'rgba(63,185,80,0.12)' : 'rgba(248,81,73,0.12)',
+                  border: `1px solid ${ch.tieneReporte ? 'rgba(63,185,80,0.3)' : 'rgba(248,81,73,0.3)'}`,
+                }}>
+                  <span style={{ fontSize:'14px' }}>{ch.tieneReporte ? '✅' : '❌'}</span>
+                  <div>
+                    <div style={{ fontSize:'11px', fontWeight:600, color:'var(--text)' }}>{ch.nombre||ch.usuario}</div>
+                    {ch.vehiculo && <div style={{ fontSize:'10px', color:'var(--text3)' }}>{ch.vehiculo}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))', gap:'1rem', marginBottom:'1.5rem' }}>
-        {kpis.map(k=>(
-          <div key={k.label} className="stat-card">
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-              <div style={{ flex:1 }}>
-                <p className="stat-label">{k.label}</p>
-                <p className="stat-value" style={{ color:k.color }}>{k.value}</p>
-                <p className="stat-sub">{k.sub}</p>
-              </div>
-              <span style={{ fontSize:'1.5rem', opacity:.65 }}>{k.icon}</span>
-            </div>
+      {/* ── KPIs — tablero-card estilo GAS ─────────────────────────────────── */}
+      <div className="tablero" style={{ marginBottom:'1.5rem' }}>
+        {[
+          { id:'t-activos', label:'Beneficiarios activos', value:String(tab.beneficiariosActivos), color:'blue',  sub: tab.bajasMes>0 ? `${tab.bajasMes} baja${tab.bajasMes!==1?'s':''} este mes` : tab.mesNombre },
+          { id:'t-bajas',   label:'Bajas del mes',          value:String(tab.bajasMes),            color:'red',   sub:'' },
+          { id:'t-egresos', label:'Gasto del mes',          value:fmtK(tab.totalEgresosMes),       color:'amber', sub:`${tab.egresosMes} registros` },
+          { id:'t-ingresos',label:'Facturado pagado',       value:fmtK(tab.totalPagadoMes),        color:'green', sub:`Presentado: ${fmtK(tab.totalPresentadoMes)}` },
+          { id:'t-km',      label:'KM del mes',             value:tab.kmMes>0?tab.kmMes.toLocaleString('es-AR')+'km':'—', color:'purple', sub: tab.combustibleMes>0?`${tab.combustibleMes.toFixed(0)} L`:'' },
+        ].map(k => (
+          <div key={k.id} className={`tablero-card ${k.color}`}>
+            <div className="tablero-label">{k.label}</div>
+            <div className="tablero-value" id={k.id}>{k.value}</div>
+            {k.sub && <div className="tablero-sub">{k.sub}</div>}
           </div>
         ))}
       </div>
 
-      {/* Saldo del mes */}
-      <div className="card" style={{ marginBottom:'1.5rem', padding:'1rem 1.25rem',
-        borderLeft:`4px solid ${saldo>=0?'var(--green)':'var(--red)'}` }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'.5rem' }}>
-          <div>
-            <p style={{ fontSize:'.78rem', color:'var(--text3)', marginBottom:'.2rem' }}>Saldo del mes · cobrado − egresos</p>
-            <p style={{ fontSize:'1.6rem', fontWeight:700, color:saldo>=0?'var(--green)':'var(--red)' }}>
-              {saldo>=0?'+':''}{fmt(saldo)}
-            </p>
-          </div>
-          <div style={{ display:'flex', gap:'2rem', textAlign:'right' }}>
+      {/* Saldo + Movimientos */}
+      <div style={{ display:'grid', gridTemplateColumns:'minmax(200px,1fr) minmax(280px,2fr)', gap:'1rem', marginBottom:'1.5rem', alignItems:'start' }}>
+        {/* Saldo */}
+        <div className="card" style={{ borderLeft:`4px solid ${saldo>=0?'var(--green)':'var(--red)'}` }}>
+          <p style={{ fontSize:'.78rem', color:'var(--text3)', marginBottom:'.35rem' }}>Saldo del mes · cobrado − egresos</p>
+          <p style={{ fontSize:'1.6rem', fontWeight:700, color:saldo>=0?'var(--green)':'var(--red)' }}>
+            {saldo>=0?'+':''}{fmt(saldo)}
+          </p>
+          <div style={{ display:'flex', gap:'1rem', marginTop:'.5rem', flexWrap:'wrap' }}>
             {[['Cobrado',tab.totalPagadoMes,'var(--green)'],['Pendiente',tab.totalPresentadoMes,'var(--amber)'],['Egresos',tab.totalEgresosMes,'var(--red)']].map(([l,v,c])=>(
               <div key={String(l)}>
-                <p style={{ fontSize:'.72rem', color:'var(--text3)' }}>{l}</p>
-                <p style={{ fontSize:'.95rem', fontWeight:600, color:String(c) }}>{fmt(Number(v))}</p>
+                <p style={{ fontSize:'.7rem', color:'var(--text3)' }}>{l}</p>
+                <p style={{ fontSize:'.88rem', fontWeight:600, color:String(c) }}>{fmt(Number(v))}</p>
               </div>
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* Semáforo + Movimientos */}
-      <div style={{ display:'grid', gridTemplateColumns:'minmax(200px,1fr) minmax(280px,2fr)', gap:'1rem', marginBottom:'1.5rem', alignItems:'start' }}>
-        {/* Semáforo */}
-        <div className="card">
-          <p style={{ fontSize:'.85rem', fontWeight:600, color:'var(--text)', marginBottom:'.85rem' }}>🚦 Choferes hoy</p>
-          {tab.estadoChoferes.length===0 ? (
-            <p style={{ fontSize:'.82rem', color:'var(--text3)' }}>Sin choferes registrados</p>
-          ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:'.4rem' }}>
-              {tab.estadoChoferes.map((c,i)=>(
-                <div key={c.nombre||i} style={{ display:'flex', alignItems:'center', gap:'.6rem',
-                  padding:'.45rem .65rem', background:'var(--bg4)', borderRadius:'var(--radius)' }}>
-                  <span className={`semaforo-dot ${c.tieneReporte?'verde':'rojo'}`}/>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <p style={{ fontSize:'.82rem', fontWeight:500, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {c.nombre||c.usuario||'—'}
-                    </p>
-                    {c.vehiculo&&<p style={{ fontSize:'.72rem', color:'var(--text3)' }}>{c.vehiculo}</p>}
-                  </div>
-                  <span style={{ fontSize:'.7rem', color:c.tieneReporte?'var(--green)':'var(--red)', fontWeight:600, whiteSpace:'nowrap' }}>
-                    {c.tieneReporte?'✓ OK':'Sin rep.'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Últimos movimientos */}
