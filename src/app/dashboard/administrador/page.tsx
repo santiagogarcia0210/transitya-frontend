@@ -98,10 +98,14 @@ export default function AdministradorPage() {
   const [msgF,          setMsgF]          = useState<{ text: string; ok: boolean } | null>(null);
 
   /* — Salud del sistema — */
-  const [salud,         setSalud]         = useState<Record<string,unknown>|null>(null);
-  const [loadingSalud,  setLoadingSalud]  = useState(false);
-  const [backingUp,     setBackingUp]     = useState(false);
-  const [backupMsg,     setBackupMsg]     = useState('');
+  const [salud,            setSalud]            = useState<Record<string,unknown>|null>(null);
+  const [loadingSalud,     setLoadingSalud]      = useState(false);
+  const [backingUp,        setBackingUp]         = useState(false);
+  const [backupMsg,        setBackupMsg]         = useState('');
+  const [notifEmail,       setNotifEmail]        = useState('');
+  const [savingNotifEmail, setSavingNotifEmail]  = useState(false);
+  const [msgNotifEmail,    setMsgNotifEmail]     = useState('');
+  const [instalandoTodos,  setInstalandoTodos]   = useState(false);
 
   /* — Asistencia hoy — */
   const [asistHoy,      setAsistHoy]      = useState<{chofer:string;presentes:number;ausentes:number;pendientes:number;total:number;tomada:boolean}[]>([]);
@@ -144,7 +148,12 @@ export default function AdministradorPage() {
 
   const cargarSalud = async () => {
     setLoadingSalud(true);
-    try { const r = await api.get('/api/admin/salud'); setSalud(serializarFirestore(r.data)); }
+    try {
+      const r = await api.get('/api/admin/salud');
+      const d = serializarFirestore(r.data);
+      setSalud(d);
+      if (d.notifEmail) setNotifEmail(String(d.notifEmail));
+    }
     catch { /* silent */ }
     setLoadingSalud(false);
   };
@@ -153,8 +162,27 @@ export default function AdministradorPage() {
     try {
       const r = await api.post('/api/admin/backup');
       setBackupMsg(`✓ Backup generado: ${r.data?.archivo || r.data?.filename || 'completado'}`);
+      setTimeout(cargarSalud, 800);
     } catch { setBackupMsg('Error al ejecutar backup'); }
     setBackingUp(false);
+  };
+
+  const instalarTodosLosTriggers = async () => {
+    setInstalandoTodos(true);
+    try {
+      await api.post('/api/admin/instalar-todos-triggers', {});
+      setTimeout(cargarSalud, 800);
+    } catch { /* silent */ }
+    setInstalandoTodos(false);
+  };
+
+  const guardarNotifEmail = async () => {
+    setSavingNotifEmail(true); setMsgNotifEmail('');
+    try {
+      await api.post('/api/admin/notif-email', { email: notifEmail });
+      setMsgNotifEmail('✓ Guardado');
+    } catch { setMsgNotifEmail('Error al guardar'); }
+    setSavingNotifEmail(false);
   };
 
   const cargarAsistHoy = async () => {
@@ -524,57 +552,133 @@ export default function AdministradorPage() {
 
       {/* ══ Tab Salud del Sistema ══════════════════════════════════════ */}
       {tab === 'salud' && (
-        <div>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem', flexWrap:'wrap', gap:'.5rem' }}>
-            <p style={{ fontSize:'.85rem', color:'var(--text3)' }}>Estado de colecciones y servicios del tenant.</p>
-            <div style={{ display:'flex', gap:'.5rem', alignItems:'center' }}>
-              {backupMsg && <span style={{ fontSize:'.82rem', color: backupMsg.startsWith('✓')?'var(--green)':'var(--red)' }}>{backupMsg}</span>}
-              <button className="btn btn-secondary" onClick={cargarSalud} disabled={loadingSalud}>↻ Actualizar</button>
-              <button className="btn btn-primary" onClick={ejecutarBackup} disabled={backingUp}>
-                {backingUp ? <><span className="spinner" style={{width:12,height:12}}/> Ejecutando…</> : '💾 Backup manual'}
+        <div style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+
+          {/* Backup destacado */}
+          <div className="card" style={{ padding:'1.25rem', border:'1px solid rgba(47,129,247,0.35)' }}>
+            <p style={{ fontWeight:700, color:'var(--text)', marginBottom:'.5rem' }}>☁ Backup de la planilla</p>
+            <p style={{ fontSize:'.82rem', color:'var(--text3)', marginBottom:'.75rem', lineHeight:1.6 }}>
+              Copia de seguridad completa. El backup automático se activa con el trigger semanal.
+            </p>
+            {backupMsg && (
+              <p style={{ fontSize:'.78rem', color: backupMsg.startsWith('✓')?'var(--green)':'var(--red)', marginBottom:'.5rem' }}>
+                {backupMsg}
+              </p>
+            )}
+            <div style={{ display:'flex', gap:'.5rem', flexWrap:'wrap' }}>
+              <button className="btn btn-primary" style={{ fontSize:'.82rem' }} onClick={ejecutarBackup} disabled={backingUp}>
+                {backingUp ? <><span className="spinner" style={{width:10,height:10}}/> Ejecutando…</> : '☁ Hacer backup ahora'}
+              </button>
+              <button className="btn btn-secondary" style={{ fontSize:'.82rem' }} onClick={cargarSalud} disabled={loadingSalud}>
+                ↻ Actualizar
               </button>
             </div>
           </div>
 
           {loadingSalud ? (
             <div style={{display:'flex',alignItems:'center',gap:'.75rem',color:'var(--text3)',padding:'2rem'}}><span className="spinner"/> Cargando…</div>
-          ) : !salud ? (
-            <div className="empty-state"><div className="empty-icon">🩺</div><p>Sin datos de salud disponibles</p></div>
-          ) : (
-            <div>
-              {/* Colecciones */}
-              {!!(salud.colecciones) && (
-                <div>
-                  <p style={{ fontSize:'.82rem', fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'.75rem' }}>
-                    Colecciones
+          ) : salud && (
+            <>
+              {/* Stats: colecciones + registros */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+                <div className="stat-card">
+                  <p className="stat-label">Colecciones</p>
+                  <p className="stat-value" style={{ color:'var(--blue)', fontSize:'1.8rem' }}>
+                    {Number(salud.hojas || 0)}
                   </p>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:'1rem', marginBottom:'1.5rem' }}>
-                    {Object.entries(salud.colecciones as Record<string,number>).map(([col, count]) => (
-                      <div key={col} className="stat-card">
-                        <p className="stat-label">{col}</p>
-                        <p className="stat-value" style={{ color:'var(--blue)', fontSize:'1.6rem' }}>{count}</p>
-                        <p className="stat-sub">documentos</p>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="stat-sub">en el sistema</p>
                 </div>
-              )}
-              {/* Info extra */}
-              <div style={{ display:'grid', gap:'.5rem' }}>
-                {[
-                  ['Último backup',       String(salud.ultimoBackup    || '')],
-                  ['Última ubicación',    String(salud.ultimaUbicacion || '')],
-                  ['Triggers activos',    String(salud.triggersActivos || '')],
-                  ['Versión',             String(salud.version         || '')],
-                ].filter(([,v]) => v).map(([l, v]) => (
-                  <div key={String(l)} className="card" style={{ padding:'.6rem 1rem', display:'flex', justifyContent:'space-between' }}>
-                    <span style={{ fontSize:'.85rem', color:'var(--text3)' }}>{l}</span>
-                    <span style={{ fontSize:'.85rem', fontWeight:600, color:'var(--text)' }}>{String(v)}</span>
-                  </div>
-                ))}
+                <div className="stat-card">
+                  <p className="stat-label">Registros</p>
+                  <p className="stat-value" style={{ color:'var(--green)', fontSize:'1.8rem' }}>
+                    {Number(salud.registros || 0).toLocaleString('es-AR')}
+                  </p>
+                  <p className="stat-sub">total documentos</p>
+                </div>
               </div>
-            </div>
+
+              {/* Triggers */}
+              {salud.triggers && (() => {
+                const t = salud.triggers as Record<string,boolean>;
+                const tick = (v: boolean) => v ? '✅' : '❌';
+                return (
+                  <div className="card" style={{ padding:'1.25rem' }}>
+                    <p style={{ fontWeight:700, color:'var(--text)', marginBottom:'.85rem' }}>⚡ Triggers automáticos</p>
+                    <div style={{ display:'grid', gap:'.5rem', fontSize:'.85rem', color:'var(--text)' }}>
+                      <div>{tick(t.backup)} &nbsp; Backup semanal (domingos 3:00 AM)</div>
+                      <div>{tick(t.cierre)} &nbsp; Cierre de día (lun-vie 20:00)</div>
+                      <div>{tick(t.renovacion)} &nbsp; Renovación de mes (día 1 de cada mes)</div>
+                      <div>{tick(t.vencimientos)} &nbsp; Vencimiento de documentos (lunes 8:00)</div>
+                      <div>{tick(t.resumen)} &nbsp; Resumen mensual (día 1 de cada mes 8:00)</div>
+                    </div>
+                    <div style={{ display:'flex', gap:'.5rem', marginTop:'1rem' }}>
+                      <button className="btn btn-secondary" style={{ fontSize:'.82rem' }}
+                        onClick={instalarTodosLosTriggers} disabled={instalandoTodos}>
+                        {instalandoTodos ? <><span className="spinner" style={{width:10,height:10}}/> …</> : '⚡ Instalar todos los triggers'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Estado */}
+              <div className="card" style={{ padding:'1.25rem' }}>
+                <p style={{ fontWeight:700, color:'var(--text)', marginBottom:'.85rem' }}>📊 Estado</p>
+                <div style={{ display:'grid', gap:'.5rem', fontSize:'.85rem', color:'var(--text3)' }}>
+                  <div><strong style={{ color:'var(--text)' }}>Último backup:</strong> {String(salud.ultimoBackup || '—')}</div>
+                  <div><strong style={{ color:'var(--text)' }}>Última ubicación GPS:</strong> {String(salud.ultimaUbicacion || '—')}</div>
+                  <div><strong style={{ color:'var(--text)' }}>Consultado:</strong> {String(salud.fechaConsulta || '—')}</div>
+                </div>
+                {!!(salud.colecciones) && (
+                  <div style={{ marginTop:'1rem' }}>
+                    <p style={{ fontSize:'.72rem', fontWeight:700, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.06em', marginBottom:'.5rem' }}>
+                      Colecciones
+                    </p>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))', gap:'.5rem' }}>
+                      {Object.entries(salud.colecciones as Record<string,number>).map(([c, count]) => (
+                        <div key={c} style={{ display:'flex', justifyContent:'space-between', fontSize:'.82rem',
+                          padding:'.35rem .6rem', background:'var(--bg4)', borderRadius:'var(--radius)' }}>
+                          <span style={{ color:'var(--text3)' }}>{c}</span>
+                          <span style={{ fontWeight:600, color:'var(--blue)' }}>{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div style={{ display:'flex', gap:'.5rem', marginTop:'1rem' }}>
+                  <button className="btn btn-secondary" style={{ fontSize:'.82rem' }} onClick={ejecutarBackup} disabled={backingUp}>
+                    {backingUp ? <><span className="spinner" style={{width:10,height:10}}/> …</> : '⬆ Backup ahora'}
+                  </button>
+                  <button className="btn btn-secondary" style={{ fontSize:'.82rem' }}
+                    onClick={instalarTodosLosTriggers} disabled={instalandoTodos}>
+                    {instalandoTodos ? <><span className="spinner" style={{width:10,height:10}}/> …</> : '⚡ Instalar todos'}
+                  </button>
+                </div>
+              </div>
+            </>
           )}
+
+          {/* Email de notificaciones */}
+          <div className="card" style={{ padding:'1.25rem' }}>
+            <p style={{ fontWeight:700, color:'var(--text)', marginBottom:'.4rem' }}>📧 Email de notificaciones</p>
+            <p style={{ fontSize:'.82rem', color:'var(--text3)', marginBottom:'.75rem' }}>
+              Email donde recibís alertas de asistencia, vencimientos y gastos elevados.
+            </p>
+            <div style={{ display:'flex', gap:'.5rem', alignItems:'center' }}>
+              <input type="email" className="input" style={{ flex:1 }} placeholder="admin@ejemplo.com"
+                value={notifEmail} onChange={e => setNotifEmail(e.target.value)} />
+              <button className="btn btn-primary" style={{ fontSize:'.82rem', whiteSpace:'nowrap' }}
+                onClick={guardarNotifEmail} disabled={savingNotifEmail}>
+                {savingNotifEmail ? <span className="spinner" style={{width:10,height:10}}/> : 'Guardar'}
+              </button>
+            </div>
+            {msgNotifEmail && (
+              <p style={{ fontSize:'.78rem', color: msgNotifEmail.startsWith('✓')?'var(--green)':'var(--red)', marginTop:'.4rem' }}>
+                {msgNotifEmail}
+              </p>
+            )}
+          </div>
+
         </div>
       )}
 
