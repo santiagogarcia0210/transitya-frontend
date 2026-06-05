@@ -111,11 +111,128 @@ function MapaChoferes({ ubicaciones, fullscreen }: { ubicaciones:UbicChofer[]; f
   );
 }
 
+/* ─── Módulo Chofer ──────────────────────────────────────────────────── */
+
+interface PerfilChofer { rol:string; nombre:string; email:string; vehiculo:string; }
+
+function ChoferDashboard({ perfil }: { perfil: PerfilChofer }) {
+  const router   = useRouter();
+  const hoy      = new Date();
+  const isoToES  = (iso: string) => { const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; };
+  const fechaES  = isoToES(hoy.toISOString().split('T')[0]);
+  const DIAS_SEM = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const MESES_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const fechaTxt = `${DIAS_SEM[hoy.getDay()]} ${hoy.getDate()} de ${MESES_ES[hoy.getMonth()]}`;
+
+  const [chicosHoy, setChicosHoy] = useState<number|null>(null);
+  const [asistStat, setAsistStat] = useState<{presentes:number;pendientes:number}|null>(null);
+
+  useEffect(() => {
+    api.get(`/api/asistencia/beneficiarios?fecha=${encodeURIComponent(fechaES)}`)
+      .then(r => setChicosHoy(toArray(r.data).length))
+      .catch(() => setChicosHoy(0));
+
+    api.get(`/api/asistencia/estado?fecha=${encodeURIComponent(fechaES)}`)
+      .then(r => {
+        const items = toArray(r.data).map(serializarFirestore);
+        const presentes  = items.filter((a:Record<string,unknown>) => a.presente !== false).length;
+        const pendientes = items.filter((a:Record<string,unknown>) => a.presente === undefined || a.presente === null).length;
+        setAsistStat({ presentes, pendientes });
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 18px',
+        background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', marginBottom:12 }}>
+        <div style={{ width:44, height:44, borderRadius:'50%', background:'rgba(47,129,247,0.15)',
+          display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
+          🚗
+        </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:'1rem', fontWeight:700, color:'var(--text)' }}>
+            Hola, {perfil.nombre || perfil.email}
+          </div>
+          <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{fechaTxt}</div>
+        </div>
+      </div>
+
+      {/* Resumen día */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+        <div className="tablero-card blue" style={{ padding:14 }}>
+          <div className="tablero-label">Mis chicos hoy</div>
+          <div className="tablero-value">
+            {chicosHoy === null ? <span className="spinner" style={{width:20,height:20}}/> : chicosHoy}
+          </div>
+        </div>
+        <div className="tablero-card green" style={{ padding:14 }}>
+          <div className="tablero-label">Asistencia</div>
+          <div className="tablero-value">
+            {asistStat === null ? <span className="spinner" style={{width:20,height:20}}/> : asistStat.presentes}
+          </div>
+          <div className="tablero-sub" style={{ color: asistStat?.pendientes===0 ? 'var(--green)' : 'var(--amber)' }}>
+            {asistStat === null ? '' : asistStat.pendientes > 0 ? `${asistStat.pendientes} pendientes` : '✓ Completado'}
+          </div>
+        </div>
+      </div>
+
+      {/* KM / Velocidad / GPS */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>
+        {([
+          { label:'hoy',       value:'0 km',   color:'var(--blue)' },
+          { label:'velocidad', value:'— km/h', color:'var(--green)' },
+          { label:'GPS',       value:'📍',     color:'var(--text3)' },
+        ] as { label:string; value:string; color:string }[]).map((s,i) => (
+          <div key={i} style={{ background:'var(--bg3)', borderRadius:10, padding:10, textAlign:'center' }}>
+            <div style={{ fontSize:18, fontWeight:800, color:s.color }}>{s.value}</div>
+            <div style={{ fontSize:10, color:'var(--text3)' }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Quick actions */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:12 }}>
+        <button className="btn btn-primary"
+          style={{ flexDirection:'column', height:66, gap:4 }}
+          onClick={() => router.push('/dashboard/asistencia')}>
+          <span style={{ fontSize:18 }}>📋</span>
+          <span style={{ fontSize:12 }}>Asistencia</span>
+        </button>
+        <button className="btn btn-primary"
+          style={{ flexDirection:'column', height:66, gap:4, background:'linear-gradient(135deg,#1a73e8,#0d47a1)' }}
+          onClick={() => router.push('/dashboard/reportes-km')}>
+          <span style={{ fontSize:18 }}>🗺</span>
+          <span style={{ fontSize:12 }}>Mi ruta</span>
+        </button>
+        <button className="btn btn-secondary"
+          style={{ flexDirection:'column', height:66, gap:4 }}
+          onClick={() => router.push('/dashboard/egresos')}>
+          <span style={{ fontSize:18 }}>💸</span>
+          <span style={{ fontSize:12 }}>Egresos</span>
+        </button>
+      </div>
+
+      {perfil.vehiculo && (
+        <div style={{ padding:'.65rem 1rem', background:'var(--bg3)', borderRadius:'var(--radius)',
+          fontSize:'.82rem', color:'var(--text3)' }}>
+          🚐 {perfil.vehiculo}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════════════ */
 
 export default function DashboardPage() {
   const router        = useRouter();
   const { tipo }      = useEmpresaTipo();
+
+  /* — Perfil (para detección de rol chofer) — */
+  const [perfil,        setPerfil]       = useState<PerfilChofer|null>(null);
+  const [perfilLoaded,  setPerfilLoaded] = useState(false);
 
   const [tab,           setTab]         = useState<Tablero|null>(null);
   const [movimientos,   setMovimientos] = useState<Movimiento[]>([]);
@@ -250,15 +367,34 @@ export default function DashboardPage() {
     } catch { /* opcional */ }
   };
 
+  /* Fetch perfil first, then conditionally load admin data */
   useEffect(() => {
+    api.get('/api/usuarios/perfil')
+      .then(r => setPerfil(serializarFirestore(r.data) as PerfilChofer))
+      .catch(() => {})
+      .finally(() => setPerfilLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    if (!perfilLoaded) return;
+    if (perfil?.rol === 'chofer') { setLoading(false); return; }
     fetchTablero();
     fetchUbicaciones();
     fetchAsistHoy();
     const interval = setInterval(fetchUbicaciones, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [perfilLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ─── Estados de carga ─────────────────────────────────────────── */
+  if (!perfilLoaded) return (
+    <div style={{ display:'flex', alignItems:'center', gap:'.75rem', color:'var(--text3)', paddingTop:'2rem' }}>
+      <span className="spinner" /> Cargando…
+    </div>
+  );
+
+  /* ─── Módulo chofer ─────────────────────────────────────────────── */
+  if (perfil?.rol === 'chofer') return <ChoferDashboard perfil={perfil} />;
+
   if (loading) return (
     <div style={{ display:'flex', alignItems:'center', gap:'.75rem', color:'var(--text3)', paddingTop:'2rem' }}>
       <span className="spinner" /> Cargando tablero…
