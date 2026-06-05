@@ -7,6 +7,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
+import { useUserRol } from '@/hooks/useUserRol';
 import MiEmpresaModal from '@/components/MiEmpresaModal';
 
 /* ── Módulos ─────────────────────────────────────────────────────────── */
@@ -36,6 +37,17 @@ const ESCOLAR_EXTRAS: LinkItem[] = [
   { href: '/dashboard/facturacion',       label: '💳 Facturación' },
 ];
 
+/** Módulos visibles solo para choferes (cualquier tipo de empresa). */
+const CHOFER_LINKS: LinkItem[] = [
+  { href: '/dashboard',             label: '🏠 Inicio' },
+  { href: '/dashboard/asistencia',  label: '📋 Asistencia' },
+  { href: '/dashboard/mi-ruta',     label: '🗺️ Mi ruta' },
+  { href: '/dashboard/egresos',     label: '💸 Egresos' },
+  { href: '/dashboard/remitos',     label: '🧾 Remitos' },
+  { href: '/dashboard/reportes-km', label: '📊 Reportes KM' },
+  { href: '/dashboard/vencimientos',label: '📅 Vencimientos' },
+];
+
 const TYPE_EXTRAS: Record<string, LinkItem[]> = {
   transporte_escolar:  ESCOLAR_EXTRAS,
   transporte_especial: ESCOLAR_EXTRAS, // alias — ambas claves muestran lo mismo
@@ -63,18 +75,20 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
   const { tipo, loading: tipoLoading } = useEmpresaTipo();
-  const [showEmpresa, setShowEmpresa] = useState(false);
+  const { rol }                         = useUserRol();
+  const [showEmpresa, setShowEmpresa]   = useState(false);
+
+  const esChofer = rol === 'chofer';
 
   /**
-   * Armamos la lista de links:
-   * [Inicio] + extras del tipo + resto de universales
-   * Si el tipo no existe o hubo error, se muestran solo universales (fallback seguro).
+   * Choferes: lista fija reducida.
+   * Admins: Inicio + extras del tipo + resto de universales.
    */
   const links = useMemo<LinkItem[]>(() => {
+    if (esChofer) return CHOFER_LINKS;
     const extras: LinkItem[] = (tipo ? TYPE_EXTRAS[tipo] : undefined) ?? [];
-    // Inicio + extras del tipo + resto de universales
     return [UNIVERSAL[0], ...extras, ...UNIVERSAL.slice(1)];
-  }, [tipo]);
+  }, [tipo, esChofer]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -182,7 +196,7 @@ export default function Sidebar() {
 
       {/* Mi empresa + Logout */}
       <div style={{ padding: '.75rem 1rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
-        <button
+        {!esChofer && <button
           onClick={() => setShowEmpresa(true)}
           style={{
             width: '100%', display: 'flex', alignItems: 'center', gap: '.6rem',
@@ -201,7 +215,7 @@ export default function Sidebar() {
           }}
         >
           <span>🏢</span> Mi empresa
-        </button>
+        </button>}
         <button
           onClick={handleLogout}
           style={{
