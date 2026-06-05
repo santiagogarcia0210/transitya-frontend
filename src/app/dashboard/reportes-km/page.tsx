@@ -113,8 +113,14 @@ export default function ReportesKMPage() {
   });
   const totalKM=filtrados.reduce((s,r)=>s+r.kmRecorridos,0);
   const totalL =filtrados.reduce((s,r)=>s+r.combustibleLitros,0);
+  const getFechaKey=(f:string)=>{
+    if(!f)return'sin-mes';
+    if(/^\d{4}-\d{2}/.test(f))return f.slice(0,7);
+    const p=f.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    return p?`${p[3]}-${p[2].padStart(2,'0')}`:f.slice(0,7)||'sin-mes';
+  };
   const porMes:Record<string,ReporteKM[]>={};
-  filtrados.forEach(r=>{const m=r.fecha.slice(0,7)||'sin-mes';if(!porMes[m])porMes[m]=[];porMes[m].push(r);});
+  filtrados.forEach(r=>{const m=getFechaKey(r.fecha);if(!porMes[m])porMes[m]=[];porMes[m].push(r);});
 
   const kmCalc=Math.max(0,(parseFloat(form.kmFinal)||0)-(parseFloat(form.kmInicial)||0));
   const setF=(k:keyof FormState)=>(ev:React.ChangeEvent<HTMLInputElement>)=>setForm(f=>({...f,[k]:ev.target.value}));
