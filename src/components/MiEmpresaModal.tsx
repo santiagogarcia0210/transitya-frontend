@@ -38,7 +38,20 @@ export default function MiEmpresaModal({ onClose }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => setLogo(ev.target?.result as string);
+    reader.onload = ev => {
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX = 256;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setLogo(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.src = ev.target?.result as string;
+    };
     reader.readAsDataURL(file);
   };
 
@@ -49,8 +62,15 @@ export default function MiEmpresaModal({ onClose }: Props) {
       invalidateEmpresaTipoCache();
       setMsg({ text: '✅ Configuración guardada. Recargá para ver cambios.', ok: true });
       setTimeout(() => { window.location.reload(); }, 1200);
-    } catch {
-      setMsg({ text: 'Error al guardar. Intentá de nuevo.', ok: false });
+    } catch (err: unknown) {
+      console.error('[MiEmpresaModal] guardar:', err);
+      const data = (err as { response?: { data?: { error?: string; mensaje?: string }; status?: number } })?.response;
+      const detail = data?.data?.error || data?.data?.mensaje || '';
+      const status = data?.status;
+      setMsg({
+        text: `Error al guardar${detail ? `: ${detail}` : ''}${status ? ` (${status})` : ''}. Revisá la consola.`,
+        ok: false,
+      });
     }
     setSaving(false);
   };
