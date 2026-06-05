@@ -1,25 +1,31 @@
-import type { Metadata } from "next";
-import { Geist } from "next/font/google";
-import "./globals.css";
+import type { Metadata, Viewport } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
 
-const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: "Transit·Ya — Sistema de Gestión",
-  description: "Sistema multi-tenant de gestión de transporte: transporte especial, paquetería y traslados.",
+  title:       'Transit·Ya',
+  description: 'Sistema multi-tenant de gestión de transporte: transporte especial, paquetería y traslados.',
   icons: {
-    icon: [
-      { url: "/logo-icon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico" },
-    ],
-    apple: "/logo-icon.svg",
+    icon:  '/assets/logo-circular.png',
+    apple: '/assets/logo-circular.png',
   },
+};
+
+export const viewport: Viewport = {
+  width:        'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor:   '#0a0e1a',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${geist.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="es" className={inter.variable}>
+      <body style={{ margin: 0, minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font)' }}>
+        {children}
+      </body>
     </html>
   );
 }

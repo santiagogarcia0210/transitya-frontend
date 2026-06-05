@@ -1,5 +1,6 @@
 'use client';
 import { useMemo } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'firebase/auth';
@@ -85,13 +86,22 @@ export default function Sidebar() {
       background: 'var(--bg2)', borderRight: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column',
     }}>
-      {/* Logo */}
+      {/* Logo — horizontal en desktop, ícono en mobile */}
+      <style>{`
+        .sidebar-logo-h { display: block; }
+        .sidebar-logo-i { display: none;  }
+        @media (max-width: 768px) {
+          .sidebar-logo-h { display: none;  }
+          .sidebar-logo-i { display: block; }
+        }
+      `}</style>
       <div style={{ padding: '1rem 1rem .85rem', borderBottom: '1px solid var(--border)' }}>
-        <img
-          src="/logo.svg"
-          alt="Transit·Ya"
-          style={{ display: 'block', height: 32, width: 'auto' }}
-        />
+        <span className="sidebar-logo-h">
+          <Image src="/assets/logo-horizontal.png" alt="Transit·Ya" width={150} height={44} style={{ objectFit: 'contain' }} priority />
+        </span>
+        <span className="sidebar-logo-i">
+          <Image src="/assets/logo-icon.png" alt="Transit·Ya" width={32} height={32} style={{ objectFit: 'contain' }} priority />
+        </span>
         {/* Badge del tipo (visible una vez cargado) */}
         {!tipoLoading && tipo && (
           <span style={{

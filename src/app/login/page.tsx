@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Image from 'next/image';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -53,27 +54,16 @@ export default function LoginPage() {
         boxShadow: '0 24px 64px rgba(0,0,0,.45), 0 0 0 1px rgba(59,130,246,.06)',
       }}>
 
-        {/* Logo hero */}
+        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: '1rem' }}>
-            <img
-              src="/logo-icon.svg"
-              alt="Transit·Ya"
-              width={72}
-              height={72}
-              style={{ display: 'block', filter: 'drop-shadow(0 8px 24px rgba(59,130,246,.4))' }}
-            />
-          </div>
-          <h1 style={{
-            fontSize: '1.75rem', fontWeight: 800, color: 'var(--text)',
-            letterSpacing: '-0.5px', lineHeight: 1.1,
-          }}>
-            Transit<span style={{ color: 'var(--blue-bright)' }}>·Ya</span>
-          </h1>
-          <p style={{ fontSize: '.875rem', color: 'var(--text3)', marginTop: '.4rem' }}>
-            Sistema de gestión de transporte
-          </p>
+          <Image
+            src="/assets/logo-horizontal.png"
+            alt="Transit·Ya"
+            width={200}
+            height={60}
+            style={{ objectFit: 'contain', margin: '0 auto', display: 'block' }}
+            priority
+          />
         </div>
 
         {/* Form */}
