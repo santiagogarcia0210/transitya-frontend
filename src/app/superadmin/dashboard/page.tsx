@@ -23,13 +23,21 @@ function diasBadge(dias: number) {
 export default function SADashboard() {
   const [data,    setData]    = useState<DashData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
 
   const cargar = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setError('');
     try {
       const r = await api.get('/api/superadmin/dashboard');
+      if (r.data?.ok === false) throw new Error(r.data.mensaje || 'El endpoint devolvió ok:false');
       setData(r.data);
-    } catch { /* silent */ }
+    } catch (err: unknown) {
+      const msg = (err as {response?: {data?: {mensaje?: string}; status?: number}; message?: string})?.response?.data?.mensaje
+        || (err as {message?: string})?.message
+        || 'Error desconocido';
+      const status = (err as {response?: {status?: number}})?.response?.status;
+      setError(status ? `${status} — ${msg}` : msg);
+    }
     setLoading(false);
   }, []);
 
@@ -38,6 +46,17 @@ export default function SADashboard() {
   if (loading) return (
     <div style={{ display:'flex', alignItems:'center', gap:'.75rem', padding:'3rem', color:'var(--text3)' }}>
       <span className="spinner" /> Cargando dashboard…
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ padding:'2rem' }}>
+      <div style={{ background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)',
+        borderRadius:'var(--radius)', padding:'1rem 1.25rem', marginBottom:'1rem' }}>
+        <div style={{ fontWeight:700, color:'var(--red)', marginBottom:'.35rem' }}>❌ Error al cargar el dashboard</div>
+        <code style={{ fontSize:'.8rem', color:'var(--text2)', fontFamily:'monospace' }}>{error}</code>
+      </div>
+      <button className="btn btn-secondary" onClick={cargar}>↻ Reintentar</button>
     </div>
   );
 

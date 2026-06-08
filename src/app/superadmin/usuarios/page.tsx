@@ -1,13 +1,13 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 
 interface Usuario {
-  uid: string; id: string; email: string;
-  displayName: string; nombre: string;
+  uid: string; email: string; displayName: string; nombre: string;
   rol: string; tenantId: string; empresa: string;
   disabled: boolean; activo: boolean;
-  createdAt: string; creadoEn: string; lastSignIn: string;
+  createdAt: string; lastSignIn: string;
 }
 
 interface UsuarioDetalle {
@@ -18,19 +18,27 @@ interface UsuarioDetalle {
   claims: Record<string,unknown>;
 }
 
+interface Grupo {
+  tenantId: string; empresa: string;
+  usuarios: Usuario[];
+  admins: number; choferes: number; total: number;
+}
+
 const ROL_LABEL: Record<string,string> = { superadmin:'SuperAdmin', admin:'Admin', chofer:'Chofer', operador:'Operador' };
 const ROL_COLOR: Record<string,string> = { superadmin:'badge-purple', admin:'badge-blue', chofer:'badge-teal', operador:'badge-amber' };
 
 export default function UsuariosPage() {
-  const [usuarios, setUsuarios]   = useState<Usuario[]>([]);
-  const [loading,  setLoading]    = useState(true);
-  const [busqueda, setBusqueda]   = useState('');
-  const [filtroRol, setFiltroRol] = useState('');
-  const [filtroEst, setFiltroEst] = useState('');
-  const [detalle,  setDetalle]    = useState<UsuarioDetalle | null>(null);
+  const router = useRouter();
+  const [usuarios,   setUsuarios]   = useState<Usuario[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [busqueda,   setBusqueda]   = useState('');
+  const [filtroRol,  setFiltroRol]  = useState('');
+  const [filtroEst,  setFiltroEst]  = useState('');
+  const [detalle,    setDetalle]    = useState<UsuarioDetalle | null>(null);
   const [loadingDet, setLoadingDet] = useState(false);
-  const [accionUid, setAccionUid] = useState('');
-  const [msg,      setMsg]        = useState<{text:string;ok:boolean}|null>(null);
+  const [accionUid,  setAccionUid]  = useState('');
+  const [msg,        setMsg]        = useState<{text:string;ok:boolean}|null>(null);
+  const [collapsed,  setCollapsed]  = useState<Set<string>>(new Set());
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -43,7 +51,7 @@ export default function UsuariosPage() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const filtrados = usuarios.filter(u => {
+  const filtrados = useMemo(() => usuarios.filter(u => {
     const nombre = u.displayName || u.nombre || '';
     const q = busqueda.toLowerCase();
     if (q && !u.email?.toLowerCase().includes(q) && !nombre.toLowerCase().includes(q) && !u.empresa?.toLowerCase().includes(q)) return false;
@@ -52,7 +60,33 @@ export default function UsuariosPage() {
     if (filtroEst === 'activo'     && isSusp)  return false;
     if (filtroEst === 'suspendido' && !isSusp) return false;
     return true;
-  });
+  }), [usuarios, busqueda, filtroRol, filtroEst]);
+
+  const grupos: Grupo[] = useMemo(() => {
+    const map = new Map<string, Grupo>();
+
+    filtrados.forEach(u => {
+      const key = u.tenantId || '__sin_empresa__';
+      const emp = u.empresa || (u.tenantId ? u.tenantId : '');
+      if (!map.has(key)) {
+        map.set(key, { tenantId: key, empresa: emp, usuarios: [], admins: 0, choferes: 0, total: 0 });
+      }
+      const g = map.get(key)!;
+      g.usuarios.push(u);
+      g.total++;
+      if (u.rol === 'admin' || u.rol === 'administrador') g.admins++;
+      if (u.rol === 'chofer') g.choferes++;
+    });
+
+    return [...map.values()].sort((a, b) => {
+      if (a.tenantId === '__sin_empresa__') return 1;
+      if (b.tenantId === '__sin_empresa__') return -1;
+      return a.empresa.localeCompare(b.empresa, 'es');
+    });
+  }, [filtrados]);
+
+  const toggleCollapse = (key: string) =>
+    setCollapsed(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
   const verDetalle = async (uid: string) => {
     setLoadingDet(true); setDetalle(null);
@@ -63,25 +97,36 @@ export default function UsuariosPage() {
     setLoadingDet(false);
   };
 
-  const toggleEstado = async (uid: string, activo: boolean) => {
+  const toggleEstado = async (uid: string, isSusp: boolean) => {
     setAccionUid(uid); setMsg(null);
     try {
-      await api.put(`/api/superadmin/usuarios/${uid}/estado`, { activo });
-      setMsg({ text:`✅ Usuario ${activo ? 'activado' : 'suspendido'}.`, ok:true });
+      await api.put(`/api/superadmin/usuarios/${uid}/estado`, { activo: isSusp });
+      setMsg({ text:`✅ Usuario ${isSusp ? 'activado' : 'suspendido'}.`, ok:true });
       cargar();
-      if (detalle?.uid === uid) setDetalle(prev => prev ? { ...prev, disabled: !activo } : null);
+      if (detalle?.uid === uid) setDetalle(null);
     } catch { setMsg({ text:'Error al cambiar estado.', ok:false }); }
     setAccionUid('');
   };
 
-  const roles = [...new Set(usuarios.map(u => u.rol).filter(Boolean))].sort();
+  const roles = useMemo(() => [...new Set(usuarios.map(u => u.rol).filter(Boolean))].sort(), [usuarios]);
+
+  const subtituloGrupo = (g: Grupo) => {
+    const parts = [];
+    if (g.choferes > 0) parts.push(`${g.choferes} chofer${g.choferes !== 1 ? 'es' : ''}`);
+    if (g.admins > 0)   parts.push(`${g.admins} admin${g.admins !== 1 ? 's' : ''}`);
+    const resto = g.total - g.choferes - g.admins;
+    if (resto > 0) parts.push(`${resto} otro${resto !== 1 ? 's' : ''}`);
+    return parts.join(', ') || `${g.total} usuario${g.total !== 1 ? 's' : ''}`;
+  };
 
   return (
     <div>
       <div className="section-header" style={{ marginBottom:'1.25rem' }}>
         <div>
           <div className="section-title">👥 Usuarios</div>
-          <div className="section-sub">{filtrados.length} de {usuarios.length} usuario{usuarios.length !== 1 ? 's' : ''}</div>
+          <div className="section-sub">
+            {filtrados.length} usuario{filtrados.length !== 1 ? 's' : ''} en {grupos.length} empresa{grupos.length !== 1 ? 's' : ''}
+          </div>
         </div>
         <button className="btn btn-secondary" style={{ fontSize:'.8rem' }} onClick={cargar}>↻ Actualizar</button>
       </div>
@@ -99,7 +144,8 @@ export default function UsuariosPage() {
           <option value="suspendido">Suspendidos</option>
         </select>
         {(busqueda || filtroRol || filtroEst) && (
-          <button className="btn btn-secondary btn-sm" onClick={() => { setBusqueda(''); setFiltroRol(''); setFiltroEst(''); }}>✕</button>
+          <button className="btn btn-secondary btn-sm"
+            onClick={() => { setBusqueda(''); setFiltroRol(''); setFiltroEst(''); }}>✕</button>
         )}
       </div>
 
@@ -116,59 +162,107 @@ export default function UsuariosPage() {
         <div style={{ display:'flex', gap:'.75rem', color:'var(--text3)', padding:'2rem' }}>
           <span className="spinner" /> Cargando…
         </div>
-      ) : filtrados.length === 0 ? (
+      ) : grupos.length === 0 ? (
         <div className="empty-state"><div className="empty-icon">👥</div><p>Sin usuarios</p></div>
       ) : (
-        <div style={{ overflowX:'auto' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'.82rem' }}>
-            <thead>
-              <tr style={{ borderBottom:'1px solid var(--border)', color:'var(--text3)' }}>
-                {['Usuario','Empresa','Rol','Estado','Último acceso','Acciones'].map(h => (
-                  <th key={h} style={{ textAlign:'left', padding:'8px 10px', fontWeight:600, whiteSpace:'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtrados.map(u => {
-                const uid = u.uid || u.id;
-                const nombre = u.displayName || u.nombre || '(sin nombre)';
-                const isSusp = u.disabled || u.activo === false;
-                return (
-                  <tr key={uid} style={{ borderBottom:'1px solid var(--border)', opacity: isSusp ? .6 : 1 }}>
-                    <td style={{ padding:'8px 10px' }}>
-                      <div style={{ fontWeight:600, color:'var(--text)' }}>{nombre}</div>
-                      <div style={{ fontSize:'.73rem', color:'var(--text3)' }}>{u.email}</div>
-                    </td>
-                    <td style={{ padding:'8px 10px', color:'var(--text2)', fontSize:'.8rem' }}>{u.empresa || u.tenantId || '—'}</td>
-                    <td style={{ padding:'8px 10px' }}>
-                      <span className={`badge ${ROL_COLOR[u.rol]||'badge-gray'}`} style={{ fontSize:'.72rem' }}>
-                        {ROL_LABEL[u.rol]||u.rol||'—'}
-                      </span>
-                    </td>
-                    <td style={{ padding:'8px 10px' }}>
-                      <span className={`badge ${isSusp ? 'badge-red' : 'badge-green'}`} style={{ fontSize:'.72rem' }}>
-                        {isSusp ? 'Suspendido' : 'Activo'}
-                      </span>
-                    </td>
-                    <td style={{ padding:'8px 10px', color:'var(--text3)', fontSize:'.78rem' }}>
-                      {u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString('es-AR') : '—'}
-                    </td>
-                    <td style={{ padding:'8px 10px' }}>
-                      <div style={{ display:'flex', gap:'.35rem' }}>
-                        <button className="btn btn-secondary btn-sm" onClick={() => verDetalle(uid)}>Ver</button>
-                        <button
-                          className={`btn btn-sm ${isSusp ? 'btn-primary' : 'btn-danger'}`}
-                          disabled={accionUid === uid}
-                          onClick={() => toggleEstado(uid, isSusp)}>
-                          {accionUid === uid ? '…' : isSusp ? 'Activar' : 'Suspender'}
-                        </button>
+        <div style={{ display:'flex', flexDirection:'column', gap:'.85rem' }}>
+          {grupos.map(g => {
+            const isCollapsed = collapsed.has(g.tenantId);
+            const sinEmpresa  = g.tenantId === '__sin_empresa__';
+
+            return (
+              <div key={g.tenantId} className="card" style={{ padding:0, overflow:'hidden' }}>
+                {/* Header del grupo */}
+                <div
+                  style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                    padding:'.85rem 1.1rem', cursor:'pointer', background:'var(--bg3)',
+                    borderBottom: isCollapsed ? 'none' : '1px solid var(--border)' }}
+                  onClick={() => toggleCollapse(g.tenantId)}>
+                  <div style={{ display:'flex', alignItems:'center', gap:'.65rem' }}>
+                    <span style={{ fontSize:'1rem' }}>{sinEmpresa ? '❓' : '🏢'}</span>
+                    <div>
+                      <div style={{ fontWeight:700, fontSize:'.9rem', color:'var(--text)' }}>
+                        {sinEmpresa ? 'Sin empresa' : (g.empresa || g.tenantId)}
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <div style={{ fontSize:'.73rem', color:'var(--text3)', marginTop:'.1rem' }}>
+                        {subtituloGrupo(g)}
+                        {!sinEmpresa && g.tenantId && (
+                          <span style={{ marginLeft:'.4rem', opacity:.6 }}>· {g.tenantId}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:'.5rem' }}>
+                    {!sinEmpresa && (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize:'.72rem' }}
+                        onClick={e => { e.stopPropagation(); router.push(`/superadmin/empresas`); }}>
+                        Ver empresa
+                      </button>
+                    )}
+                    <span style={{ color:'var(--text3)', fontSize:'.82rem', minWidth:16, textAlign:'center' }}>
+                      {isCollapsed ? '▶' : '▼'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tabla de usuarios del grupo */}
+                {!isCollapsed && (
+                  <div style={{ overflowX:'auto' }}>
+                    <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'.82rem' }}>
+                      <tbody>
+                        {g.usuarios.map(u => {
+                          const uid    = u.uid;
+                          const nombre = u.displayName || u.nombre || '(sin nombre)';
+                          const isSusp = u.disabled || u.activo === false;
+
+                          return (
+                            <tr key={uid}
+                              style={{ borderBottom:'1px solid var(--border)', opacity: isSusp ? .55 : 1 }}>
+                              <td style={{ padding:'8px 12px', width:24 }}>
+                                <span style={{ fontSize:'1rem' }}>{u.rol === 'chofer' ? '🚌' : u.rol === 'admin' ? '👔' : '👤'}</span>
+                              </td>
+                              <td style={{ padding:'8px 8px' }}>
+                                <div style={{ fontWeight:600, color:'var(--text)' }}>{nombre}</div>
+                                <div style={{ fontSize:'.73rem', color:'var(--text3)' }}>{u.email}</div>
+                              </td>
+                              <td style={{ padding:'8px 8px' }}>
+                                <span className={`badge ${ROL_COLOR[u.rol]||'badge-gray'}`} style={{ fontSize:'.7rem' }}>
+                                  {ROL_LABEL[u.rol]||u.rol||'—'}
+                                </span>
+                              </td>
+                              <td style={{ padding:'8px 8px' }}>
+                                <span className={`badge ${isSusp ? 'badge-red' : 'badge-green'}`} style={{ fontSize:'.7rem' }}>
+                                  {isSusp ? 'Suspendido' : 'Activo'}
+                                </span>
+                              </td>
+                              <td style={{ padding:'8px 8px', color:'var(--text3)', fontSize:'.75rem', whiteSpace:'nowrap' }}>
+                                {u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString('es-AR') : '—'}
+                              </td>
+                              <td style={{ padding:'8px 12px 8px 4px' }}>
+                                <div style={{ display:'flex', gap:'.3rem', justifyContent:'flex-end' }}>
+                                  <button className="btn btn-secondary btn-sm" style={{ fontSize:'.72rem' }}
+                                    onClick={() => verDetalle(uid)}>Ver</button>
+                                  <button
+                                    className={`btn btn-sm ${isSusp ? 'btn-primary' : 'btn-danger'}`}
+                                    style={{ fontSize:'.72rem' }}
+                                    disabled={accionUid === uid}
+                                    onClick={() => toggleEstado(uid, isSusp)}>
+                                    {accionUid === uid ? '…' : isSusp ? 'Activar' : 'Suspender'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -189,7 +283,7 @@ export default function UsuariosPage() {
               </div>
             ) : detalle && (
               <div style={{ display:'flex', flexDirection:'column', gap:'.75rem' }}>
-                {[
+                {([
                   ['Nombre',    detalle.displayName || detalle.nombre || '—'],
                   ['Email',     detalle.email],
                   ['Rol',       ROL_LABEL[detalle.rol]||detalle.rol||'—'],
@@ -199,7 +293,7 @@ export default function UsuariosPage() {
                   ['Registrado', (detalle.createdAt||detalle.creadoEn) ? new Date(detalle.createdAt||detalle.creadoEn).toLocaleDateString('es-AR') : '—'],
                   ['Último acceso', detalle.lastSignIn ? new Date(detalle.lastSignIn).toLocaleDateString('es-AR') : '—'],
                   ['Estado',    (detalle.disabled || detalle.activo === false) ? '🔴 Suspendido' : '🟢 Activo'],
-                ].map(([k,v]) => (
+                ] as [string,string][]).map(([k,v]) => (
                   <div key={k} style={{ display:'flex', justifyContent:'space-between', fontSize:'.84rem',
                     borderBottom:'1px solid var(--border)', paddingBottom:'.4rem' }}>
                     <span style={{ color:'var(--text3)', fontWeight:500 }}>{k}</span>
@@ -210,10 +304,14 @@ export default function UsuariosPage() {
                 <div style={{ display:'flex', gap:'.75rem', marginTop:'.5rem' }}>
                   <button className="btn btn-secondary" style={{ flex:1 }} onClick={() => setDetalle(null)}>Cerrar</button>
                   <button
-                    className={`btn ${detalle.disabled ? 'btn-primary' : 'btn-danger'}`}
+                    className={`btn ${(detalle.disabled || detalle.activo === false) ? 'btn-primary' : 'btn-danger'}`}
                     style={{ flex:1 }}
                     disabled={accionUid === detalle.uid}
-                    onClick={() => { const isSusp2 = detalle.disabled || detalle.activo === false; toggleEstado(detalle.uid, isSusp2); setDetalle(null); }}>
+                    onClick={() => {
+                      const isSusp = detalle.disabled || detalle.activo === false;
+                      toggleEstado(detalle.uid, isSusp);
+                      setDetalle(null);
+                    }}>
                     {(detalle.disabled || detalle.activo === false) ? '✅ Activar' : '⛔ Suspender'}
                   </button>
                 </div>
