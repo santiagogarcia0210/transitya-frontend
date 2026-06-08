@@ -18,7 +18,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [router]);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
+    <div className="dashboard-layout" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
       <Sidebar />
       <main style={{ flex: 1, padding: '1.75rem 2rem', overflowY: 'auto', minWidth: 0 }}>
         {children}

@@ -590,11 +590,84 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
 }
 
 @media print {
-  .dj-pages { display: block !important; gap: 0 !important; align-items: stretch !important; }
-  .dj-page  {
-    width: 210mm !important; min-height: 297mm !important; max-height: 297mm !important;
-    padding: 12mm 16mm !important; box-shadow: none !important; border-radius: 0 !important;
-    page-break-after: always !important; overflow: hidden !important; margin: 0 !important;
+  /* ── Ocultar toda la UI ─────────────────────────────────────────── */
+  aside,
+  nav,
+  header,
+  footer,
+  .no-print,
+  [class*="sidebar"],
+  [class*="Sidebar"],
+  [class*="topbar"],
+  [class*="Topbar"],
+  [class*="header"]:not(.print-area *),
+  [class*="Header"]:not(.print-area *) {
+    display: none !important;
+    visibility: hidden !important;
   }
-  .dj-page:last-child { page-break-after: auto !important; }
+
+  /* ── Reset layout ───────────────────────────────────────────────── */
+  html, body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    color: black !important;
+  }
+
+  /* Convertir el wrapper flex del dashboard a block */
+  .dashboard-layout {
+    display: block !important;
+    background: white !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  /* ── Páginas A4 ─────────────────────────────────────────────────── */
+  .dj-pages {
+    display: block !important;
+    gap: 0 !important;
+    align-items: stretch !important;
+    background: white !important;
+  }
+
+  .dj-page,
+  .carta-page,
+  .carta-cambio,
+  .print-area {
+    display: block !important;
+    visibility: visible !important;
+    width: 210mm !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 12mm 16mm !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    page-break-after: always !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    background: white !important;
+  }
+
+  .dj-page:last-child,
+  .carta-page:last-child,
+  .carta-cambio:last-child,
+  .print-area:last-child {
+    page-break-after: auto !important;
+  }
+
+  /* ── Colores de impresión ───────────────────────────────────────── */
+  .print-area * {
+    color: black !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
 }
