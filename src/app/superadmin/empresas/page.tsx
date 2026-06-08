@@ -222,10 +222,10 @@ export default function EmpresasPage() {
                   <div style={{ fontSize:'.72rem', fontWeight:700, color:'var(--text3)', textTransform:'uppercase',
                     letterSpacing:'.06em', marginBottom:'.5rem' }}>Empresa</div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.5rem', fontSize:'.82rem' }}>
-                    {[['Nombre', detalle.empresa.nombre],['Tipo',detalle.empresa.tipo],
+                    {([['Nombre', detalle.empresa.nombre],['Tipo',detalle.empresa.tipo],
                       ['Email',detalle.empresa.email],['Teléfono',detalle.empresa.telefono],
-                      ['Tenant ID', detalleId]].map(([k,v]) => (
-                      <div key={String(k)}>
+                      ['Tenant ID', detalleId]] as [string, string][]).map(([k,v]) => (
+                      <div key={k}>
                         <label style={L}>{k}</label>
                         <span style={{ color:'var(--text)' }}>{String(v||'—')}</span>
                       </div>
@@ -238,13 +238,13 @@ export default function EmpresasPage() {
                   <div style={{ fontSize:'.72rem', fontWeight:700, color:'var(--text3)', textTransform:'uppercase',
                     letterSpacing:'.06em', marginBottom:'.5rem' }}>Suscripción</div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'.5rem', fontSize:'.82rem' }}>
-                    {[['Plan', PLAN_LABEL[String(detalle.suscripcion.plan||'—')]||String(detalle.suscripcion.plan||'—')],
-                      ['Estado', detalle.suscripcion.estado],
+                    {([['Plan', PLAN_LABEL[String(detalle.suscripcion.plan||'—')]||String(detalle.suscripcion.plan||'—')],
+                      ['Estado', String(detalle.suscripcion.estado||'—')],
                       ['Próximo cobro', detalle.suscripcion.fechaProximoCobro ? new Date(String(detalle.suscripcion.fechaProximoCobro)).toLocaleDateString('es-AR') : '—'],
-                      ['Choferes incl.', detalle.suscripcion.choferesIncluidos],
+                      ['Choferes incl.', String(detalle.suscripcion.choferesIncluidos||'—')],
                       ['Precio', detalle.suscripcion.precio ? `$${Number(detalle.suscripcion.precio).toLocaleString('es-AR')}` : '—'],
-                    ].map(([k,v]) => (
-                      <div key={String(k)}>
+                    ] as [string, string][]).map(([k,v]) => (
+                      <div key={k}>
                         <label style={L}>{k}</label>
                         <span style={{ color:'var(--text)' }}>{String(v||'—')}</span>
                       </div>
