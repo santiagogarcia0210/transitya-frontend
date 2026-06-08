@@ -50,11 +50,30 @@ interface FormState {
   observaciones: string;
 }
 
+function resolverNombre(b: Record<string, unknown>): string {
+  // Campos combinados (formato nuevo y variantes)
+  const full = String(
+    b.apellidoYNombre  || b['APELLIDO Y NOMBRE'] ||
+    b.apellidoNombre   || b['apellido_nombre']   ||
+    b.nombreCompleto   || b['NOMBRE COMPLETO']   || ''
+  ).trim();
+  if (full) return full;
+
+  // Formato antiguo BENEFICIARIOS.gs: apellido y nombre guardados por separado
+  const apellido = String(b.apellido || b.APELLIDO || '').trim();
+  const nombre   = String(b.nombre   || b.NOMBRE   || '').trim();
+  const combinado = [apellido, nombre].filter(Boolean).join(' ');
+  if (combinado) return combinado;
+
+  console.warn('[registro] beneficiario sin nombre detectado — keys:', Object.keys(b).filter(k => k !== 'id').join(', '));
+  return '';
+}
+
 function normalizar(b: Record<string, unknown>): Beneficiario {
   const dias = b.diasAtencion ?? b.DIAS_ATENCION ?? b['DIAS ATENCION'] ?? [];
   return {
     id:              String(b.id              || b['ID']                       || ''),
-    apellidoYNombre: String(b.apellidoYNombre || b['APELLIDO Y NOMBRE']        || b.nombre || b.NOMBRE || b.apellido || ''),
+    apellidoYNombre: resolverNombre(b),
     dni:             String(b.dni             || b.DNI             || b.DOCUMENTO                    || ''),
     nroAfiliado:     String(b.nroAfiliado     || b['N° AFILIADO']  || b.NRO_AFILIADO                || ''),
     domicilio:       String(b.domicilio       || b.DOMICILIO       || b.direccion                   || ''),
@@ -121,7 +140,11 @@ export default function RegistroPage() {
         toArray(r.data)
           .map(serializarFirestore)
           .map(normalizar)
-          .sort((a, b) => a.apellidoYNombre.localeCompare(b.apellidoYNombre, 'es'))
+          .sort((a, b) => {
+            if (!a.apellidoYNombre && b.apellidoYNombre) return 1;
+            if (a.apellidoYNombre && !b.apellidoYNombre) return -1;
+            return a.apellidoYNombre.localeCompare(b.apellidoYNombre, 'es');
+          })
       );
     } catch (err: unknown) {
       console.error('[registro] cargar:', err);
