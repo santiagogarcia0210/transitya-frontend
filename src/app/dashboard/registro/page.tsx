@@ -6,6 +6,10 @@ import { serializarFirestore, toArray } from '@/lib/utils';
 type Tab = 'alta' | 'baja' | 'ver' | 'fs';
 const DIAS_SEM = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
 const PER_PAGE = 20;
+const DIA_ABREV: Record<string, string> = {
+  lunes: 'Lun', martes: 'Mar', miercoles: 'Mié',
+  jueves: 'Jue', viernes: 'Vie', sabado: 'Sáb', domingo: 'Dom',
+};
 
 interface Beneficiario {
   id: string;
@@ -24,6 +28,9 @@ interface Beneficiario {
   dependencia: string;
   diasAtencion: string[];
   horarioTurno: string;
+  horaIngreso: string;
+  horaEgreso: string;
+  tieneHorariosEspeciales: boolean;
   observaciones: string;
   lat: string;
   lng: string;
@@ -70,7 +77,10 @@ function resolverNombre(b: Record<string, unknown>): string {
 }
 
 function normalizar(b: Record<string, unknown>): Beneficiario {
-  const dias = b.diasAtencion ?? b.DIAS_ATENCION ?? b['DIAS ATENCION'] ?? [];
+  // horarios es un objeto anidado cargado por scripts/cargar-horarios.js
+  const h = (b.horarios && typeof b.horarios === 'object' ? b.horarios : {}) as Record<string, unknown>;
+  const diasRaw = b.diasAtencion ?? b.DIAS_ATENCION ?? b['DIAS ATENCION'] ?? h.dias ?? [];
+  const especiales = Array.isArray(h.horariosEspeciales) ? h.horariosEspeciales : [];
   return {
     id:              String(b.id              || b['ID']                       || ''),
     apellidoYNombre: resolverNombre(b),
@@ -86,8 +96,11 @@ function normalizar(b: Record<string, unknown>): Beneficiario {
     viajesMensuales: Number(b.viajesMensuales || b.VIAJESMENSUALES || b['VIAJES MENSUALES']         || 0),
     kmMensuales:     Number(b.kmMensuales     || b.KMMENSUALES     || b['KM MENSUALES']             || 0),
     dependencia:     String(b.dependencia     || b.DEPENDENCIA                                      || ''),
-    diasAtencion:    Array.isArray(dias) ? (dias as string[]) : String(dias).split(',').map(s=>s.trim()).filter(Boolean),
+    diasAtencion:    Array.isArray(diasRaw) ? (diasRaw as string[]) : String(diasRaw).split(',').map(s=>s.trim()).filter(Boolean),
     horarioTurno:    String(b.horarioTurno    || b.HORARIO_TURNO   || b['HORARIO TURNO']            || ''),
+    horaIngreso:     String(h.horaIngreso     || b.horaIngreso                                      || ''),
+    horaEgreso:      String(h.horaEgreso      || b.horaEgreso                                       || ''),
+    tieneHorariosEspeciales: (especiales as unknown[]).length > 0,
     observaciones:   String(b.observaciones   || b.OBSERVACIONES                                    || ''),
     lat:             String(b.lat             || b.LAT             || b.LATITUD                     || ''),
     lng:             String(b.lng             || b.LNG             || b.lon || b.LON || b.LONGITUD  || ''),
@@ -131,6 +144,28 @@ export default function RegistroPage() {
   const [busqueda,       setBusqueda]       = useState('');
   const [filtroLocalidad,setFiltroLocalidad]= useState('');
   const [pagina,         setPagina]         = useState(1);
+
+  /* ── GPS ── */
+  const [ubicando, setUbicando] = useState<string | null>(null);
+
+  const ubicarBeneficiario = (id: string) => {
+    if (!navigator.geolocation) { alert('Tu navegador no soporta geolocalización.'); return; }
+    setUbicando(id);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          await api.put(`/api/beneficiarios/${id}/gps`, {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
+          await cargar();
+        } catch { alert('Error al guardar la ubicación.'); }
+        setUbicando(null);
+      },
+      () => { alert('No se pudo obtener la ubicación. Verificá los permisos del navegador.'); setUbicando(null); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const cargar = useCallback(async () => {
     setLoading(true); setErrLoad(null);
@@ -493,11 +528,27 @@ export default function RegistroPage() {
                         {b.nroAfiliado&& <span>Afil: <b>{b.nroAfiliado}</b></span>}
                         {b.obraSocial && <span>{b.obraSocial}</span>}
                         {b.localidad  && <span>📍 {b.localidad}</span>}
-                        {b.diasAtencion.length > 0 && <span>📅 {b.diasAtencion.join(', ')}</span>}
-                        {b.horarioTurno && <span>🕐 {b.horarioTurno}</span>}
-                        {b.lat && b.lng
-                          ? <span className="badge badge-green">📍 GPS</span>
-                          : <span className="badge badge-gray">Sin GPS</span>}
+                        {b.diasAtencion.length > 0 && (
+                          <span>📅 {b.diasAtencion.map(d => DIA_ABREV[d.toLowerCase()] || d.slice(0,3)).join(' ')}</span>
+                        )}
+                        {(b.horaIngreso && b.horaEgreso) ? (
+                          <span>🕐 {b.tieneHorariosEspeciales ? 'Variable' : `${b.horaIngreso} - ${b.horaEgreso}`}</span>
+                        ) : b.tieneHorariosEspeciales ? (
+                          <span>🕐 Variable</span>
+                        ) : b.horarioTurno ? (
+                          <span>🕐 {b.horarioTurno}</span>
+                        ) : null}
+                        {b.lat && b.lng ? (
+                          <span className="badge badge-green" title={`${b.lat}, ${b.lng}`}>📍 GPS</span>
+                        ) : (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{ fontSize: '.72rem', padding: '2px 8px' }}
+                            disabled={ubicando === b.id}
+                            onClick={ev => { ev.stopPropagation(); ubicarBeneficiario(b.id); }}>
+                            {ubicando === b.id ? '…' : '📍 Ubicar'}
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="result-actions">
@@ -567,9 +618,31 @@ export default function RegistroPage() {
                       <td style={{ padding: '7px 10px' }}>{b.nroAfiliado}</td>
                       <td style={{ padding: '7px 10px' }}>{b.localidad}</td>
                       <td style={{ padding: '7px 10px' }}>{b.obraSocial}</td>
-                      <td style={{ padding: '7px 10px' }}>{b.diasAtencion.join(', ') || '—'}</td>
-                      <td style={{ padding: '7px 10px' }}>{b.horarioTurno || '—'}</td>
-                      <td style={{ padding: '7px 10px' }}>{b.lat && b.lng ? '📍' : '—'}</td>
+                      <td style={{ padding: '7px 10px' }}>
+                        {b.diasAtencion.length > 0
+                          ? b.diasAtencion.map(d => DIA_ABREV[d.toLowerCase()] || d.slice(0,3)).join(' ')
+                          : '—'}
+                      </td>
+                      <td style={{ padding: '7px 10px' }}>
+                        {b.tieneHorariosEspeciales
+                          ? 'Variable'
+                          : b.horaIngreso && b.horaEgreso
+                            ? `${b.horaIngreso} - ${b.horaEgreso}`
+                            : b.horarioTurno || '—'}
+                      </td>
+                      <td style={{ padding: '7px 10px' }}>
+                        {b.lat && b.lng ? (
+                          <span title={`${b.lat}, ${b.lng}`}>📍</span>
+                        ) : (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{ fontSize: '.72rem', padding: '2px 6px' }}
+                            disabled={ubicando === b.id}
+                            onClick={ev => { ev.stopPropagation(); ubicarBeneficiario(b.id); }}>
+                            {ubicando === b.id ? '…' : '📍'}
+                          </button>
+                        )}
+                      </td>
                       <td style={{ padding: '7px 10px' }}>
                         {!b.activo && <span className="badge badge-red">BAJA</span>}
                       </td>
