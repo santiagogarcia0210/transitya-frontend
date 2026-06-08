@@ -46,8 +46,13 @@ export default function LoginPage() {
     if (!email || !password) { setLoginErr('Completá email y contraseña'); return; }
     setLoading(true); setLoginErr('');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard');
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const token = await cred.user.getIdTokenResult();
+      if (token.claims.rol === 'superadmin') {
+        router.push('/superadmin');
+      } else {
+        router.push('/dashboard');
+      }
     } catch {
       setLoginErr('Email o contraseña incorrectos');
     } finally {
