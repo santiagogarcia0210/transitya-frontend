@@ -201,7 +201,7 @@ function ChoferDashboard({ perfil }: { perfil: PerfilChofer }) {
         </button>
         <button className="btn btn-primary"
           style={{ flexDirection:'column', height:66, gap:4, background:'linear-gradient(135deg,#1a73e8,#0d47a1)' }}
-          onClick={() => router.push('/dashboard/reportes-km')}>
+          onClick={() => router.push('/dashboard/mi-ruta')}>
           <span style={{ fontSize:18 }}>🗺</span>
           <span style={{ fontSize:12 }}>Mi ruta</span>
         </button>

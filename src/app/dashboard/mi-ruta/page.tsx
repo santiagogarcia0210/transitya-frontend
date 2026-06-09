@@ -77,6 +77,12 @@ function MapaRuta({ paradas }: { paradas: Parada[] }) {
 
       setTimeout(() => (map as unknown as { invalidateSize:()=>void }).invalidateSize(), 150);
     });
+    return () => {
+      if (mapInst.current) {
+        (mapInst.current as { remove:()=>void }).remove();
+        mapInst.current = null;
+      }
+    };
   }, [paradas]);
 
   return (
@@ -227,7 +233,7 @@ export default function MiRutaPage() {
           {/* Mapa */}
           {ruta.conGPS > 0 ? (
             <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
-              <MapaRuta paradas={ruta.paradas} />
+              <MapaRuta key={ruta.paradas.filter(p => p.lat).length} paradas={ruta.paradas} />
             </div>
           ) : (
             <div className="card" style={{ padding: '1rem', marginBottom: '1rem', textAlign: 'center', color: 'var(--text3)', fontSize: '.84rem' }}>
