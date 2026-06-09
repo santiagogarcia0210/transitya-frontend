@@ -146,7 +146,34 @@ export default function RegistroPage() {
   const [pagina,         setPagina]         = useState(1);
 
   /* ── GPS ── */
-  const [ubicando, setUbicando] = useState<string | null>(null);
+  const [ubicando,  setUbicando]  = useState<string | null>(null);
+  const [manualId,  setManualId]  = useState<string | null>(null);
+  const [manualLat, setManualLat] = useState('');
+  const [manualLng, setManualLng] = useState('');
+
+  const abrirManual = (id: string, ev: React.MouseEvent) => {
+    ev.stopPropagation();
+    setManualId(id); setManualLat(''); setManualLng('');
+  };
+
+  const cancelarManual = (ev: React.MouseEvent) => {
+    ev.stopPropagation();
+    setManualId(null); setManualLat(''); setManualLng('');
+  };
+
+  const guardarManual = async (id: string, ev: React.MouseEvent) => {
+    ev.stopPropagation();
+    const lat = parseFloat(manualLat);
+    const lng = parseFloat(manualLng);
+    if (!isFinite(lat) || !isFinite(lng)) { alert('Coordenadas inválidas.'); return; }
+    setUbicando(id);
+    try {
+      await api.put(`/api/beneficiarios/${id}/gps`, { lat, lng });
+      setManualId(null); setManualLat(''); setManualLng('');
+      await cargar();
+    } catch { alert('Error al guardar la ubicación.'); }
+    setUbicando(null);
+  };
 
   const ubicarBeneficiario = (id: string) => {
     if (!navigator.geolocation) { alert('Tu navegador no soporta geolocalización.'); return; }
@@ -540,14 +567,37 @@ export default function RegistroPage() {
                         ) : null}
                         {b.lat && b.lng ? (
                           <span className="badge badge-green" title={`${b.lat}, ${b.lng}`}>📍 GPS</span>
+                        ) : manualId === b.id ? (
+                          <div style={{ display: 'flex', gap: '.3rem', alignItems: 'center', flexWrap: 'wrap' }}
+                            onClick={ev => ev.stopPropagation()}>
+                            <input className="input" style={{ width: 110, fontSize: '.75rem', padding: '3px 7px' }}
+                              placeholder="Latitud" value={manualLat}
+                              onChange={e => setManualLat(e.target.value)} />
+                            <input className="input" style={{ width: 110, fontSize: '.75rem', padding: '3px 7px' }}
+                              placeholder="Longitud" value={manualLng}
+                              onChange={e => setManualLng(e.target.value)} />
+                            <button className="btn btn-primary btn-sm" style={{ fontSize: '.72rem' }}
+                              disabled={ubicando === b.id}
+                              onClick={ev => guardarManual(b.id, ev)}>
+                              {ubicando === b.id ? '…' : 'Guardar'}
+                            </button>
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: '.72rem' }}
+                              onClick={cancelarManual}>Cancelar</button>
+                          </div>
                         ) : (
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            style={{ fontSize: '.72rem', padding: '2px 8px' }}
-                            disabled={ubicando === b.id}
-                            onClick={ev => { ev.stopPropagation(); ubicarBeneficiario(b.id); }}>
-                            {ubicando === b.id ? '…' : '📍 Ubicar'}
-                          </button>
+                          <div style={{ display: 'flex', gap: '.3rem' }}>
+                            <button className="btn btn-secondary btn-sm"
+                              style={{ fontSize: '.72rem', padding: '2px 8px' }}
+                              disabled={ubicando === b.id}
+                              onClick={ev => { ev.stopPropagation(); ubicarBeneficiario(b.id); }}>
+                              {ubicando === b.id ? '…' : '📍 Ubicar'}
+                            </button>
+                            <button className="btn btn-secondary btn-sm"
+                              style={{ fontSize: '.72rem', padding: '2px 8px' }}
+                              onClick={ev => abrirManual(b.id, ev)}>
+                              📝 Manual
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -630,17 +680,43 @@ export default function RegistroPage() {
                             ? `${b.horaIngreso} - ${b.horaEgreso}`
                             : b.horarioTurno || '—'}
                       </td>
-                      <td style={{ padding: '7px 10px' }}>
+                      <td style={{ padding: '7px 10px' }} onClick={ev => ev.stopPropagation()}>
                         {b.lat && b.lng ? (
                           <span title={`${b.lat}, ${b.lng}`}>📍</span>
+                        ) : manualId === b.id ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
+                            <div style={{ display: 'flex', gap: '.2rem' }}>
+                              <input className="input" style={{ width: 90, fontSize: '.72rem', padding: '2px 5px' }}
+                                placeholder="Lat" value={manualLat}
+                                onChange={e => setManualLat(e.target.value)} />
+                              <input className="input" style={{ width: 90, fontSize: '.72rem', padding: '2px 5px' }}
+                                placeholder="Lng" value={manualLng}
+                                onChange={e => setManualLng(e.target.value)} />
+                            </div>
+                            <div style={{ display: 'flex', gap: '.2rem' }}>
+                              <button className="btn btn-primary btn-sm" style={{ fontSize: '.68rem', padding: '1px 6px' }}
+                                disabled={ubicando === b.id}
+                                onClick={ev => guardarManual(b.id, ev)}>
+                                {ubicando === b.id ? '…' : 'Guardar'}
+                              </button>
+                              <button className="btn btn-secondary btn-sm" style={{ fontSize: '.68rem', padding: '1px 6px' }}
+                                onClick={cancelarManual}>✕</button>
+                            </div>
+                          </div>
                         ) : (
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            style={{ fontSize: '.72rem', padding: '2px 6px' }}
-                            disabled={ubicando === b.id}
-                            onClick={ev => { ev.stopPropagation(); ubicarBeneficiario(b.id); }}>
-                            {ubicando === b.id ? '…' : '📍'}
-                          </button>
+                          <div style={{ display: 'flex', gap: '.2rem' }}>
+                            <button className="btn btn-secondary btn-sm"
+                              style={{ fontSize: '.72rem', padding: '2px 6px' }}
+                              disabled={ubicando === b.id}
+                              onClick={ev => { ev.stopPropagation(); ubicarBeneficiario(b.id); }}>
+                              {ubicando === b.id ? '…' : '📍'}
+                            </button>
+                            <button className="btn btn-secondary btn-sm"
+                              style={{ fontSize: '.72rem', padding: '2px 6px' }}
+                              onClick={ev => abrirManual(b.id, ev)}>
+                              📝
+                            </button>
+                          </div>
                         )}
                       </td>
                       <td style={{ padding: '7px 10px' }}>

@@ -9,6 +9,9 @@ interface Parada {
   nombre:         string;
   domicilio:      string;
   horarioTurno:   string;
+  horaIngreso:    string;
+  horaEgreso:     string;
+  tieneHorariosEspeciales: boolean;
   lat:            number | null;
   lng:            number | null;
   tieneGPS:       boolean;
@@ -55,7 +58,11 @@ function MapaRuta({ paradas }: { paradas: Parada[] }) {
           className: '', iconSize: [28, 28], iconAnchor: [14, 14],
         });
         const marker = (L.marker as Function)([p.lat, p.lng], { icon })
-          .bindPopup(`<b>${p.orden}. ${p.nombre}</b><br>${p.domicilio}${p.horarioTurno ? '<br>🕐 ' + p.horarioTurno : ''}`)
+          .bindPopup(`<b>${p.orden}. ${p.nombre}</b><br>${p.domicilio}${
+            (p.horaIngreso && p.horaEgreso)
+              ? '<br>🕐 ' + (p.tieneHorariosEspeciales ? 'Variable' : p.horaIngreso + ' - ' + p.horaEgreso)
+              : p.horarioTurno ? '<br>🕐 ' + p.horarioTurno : ''
+          }`)
           .addTo(mapInst.current as L.Map);
         marksRef.current.push(marker);
       });
@@ -127,7 +134,7 @@ export default function MiRutaPage() {
           return;
         }
       }
-      await api.put(`/api/registro/${p.fsId || p.beneficiarioId}/gps`, latLng);
+      await api.put(`/api/beneficiarios/${p.fsId || p.beneficiarioId}/gps`, latLng);
       setGpsMsg({ id: p.beneficiarioId, text: '✅ GPS actualizado.', ok: true });
       await cargar(fecha);
     } catch {
@@ -145,7 +152,7 @@ export default function MiRutaPage() {
       const coords = await geocodificarUna(p);
       if (coords) {
         try {
-          await api.put(`/api/registro/${p.fsId || p.beneficiarioId}/gps`, coords);
+          await api.put(`/api/beneficiarios/${p.fsId || p.beneficiarioId}/gps`, coords);
           ok++;
         } catch { /* continua */ }
         await new Promise(res => setTimeout(res, 1100)); // Nominatim rate limit: 1 req/s
@@ -279,7 +286,11 @@ export default function MiRutaPage() {
                     </div>
                     <div style={{ fontSize: '.78rem', color: 'var(--text3)', marginTop: '.1rem' }}>
                       {p.domicilio || '—'}
-                      {p.horarioTurno && <span style={{ marginLeft: '.4rem' }}>· 🕐 {p.horarioTurno}</span>}
+                      {(p.horaIngreso && p.horaEgreso) ? (
+                        <span style={{ marginLeft: '.4rem' }}>· 🕐 {p.tieneHorariosEspeciales ? 'Variable' : `${p.horaIngreso} - ${p.horaEgreso}`}</span>
+                      ) : p.horarioTurno ? (
+                        <span style={{ marginLeft: '.4rem' }}>· 🕐 {p.horarioTurno}</span>
+                      ) : null}
                     </div>
                     {!p.tieneGPS && (
                       <div style={{ fontSize: '.72rem', color: 'var(--amber)', marginTop: '.1rem' }}>

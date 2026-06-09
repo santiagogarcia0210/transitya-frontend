@@ -286,9 +286,9 @@ export default function AsistenciaPage() {
 
   // Lista completa de choferes y beneficiarios
   const [dChoferes,  setDChoferes]  = useState<{ id:string; nombre:string; vehiculo?:string }[]>([]);
-  const [dTodosB,    setDTodosB]    = useState<{ id:string; nombre:string; domicilio?:string; horarioTurno?:string }[]>([]);
+  const [dTodosB,    setDTodosB]    = useState<{ id:string; nombre:string; domicilio?:string; horarioTurno?:string; horaIngreso?:string; horaEgreso?:string; tieneHorariosEspeciales?:boolean }[]>([]);
   // Asignaciones del día: { choferId → [beneficiario] }
-  const [dAsig,      setDAsig]      = useState<Record<string, { id:string; nombre:string; domicilio?:string; horarioTurno?:string; ordenVisita?:number }[]>>({});
+  const [dAsig,      setDAsig]      = useState<Record<string, { id:string; nombre:string; domicilio?:string; horarioTurno?:string; horaIngreso?:string; horaEgreso?:string; tieneHorariosEspeciales?:boolean; ordenVisita?:number }[]>>({});
   const [dFecha,     setDFecha]     = useState(toISO(new Date()));
   const [dLoading,   setDLoading]   = useState(false);
   const [dSaving,    setDSaving]    = useState<Record<string,boolean>>({});
@@ -308,12 +308,19 @@ export default function AsistenciaPage() {
 
       // Beneficiarios
       const benefs = bRes.status === 'fulfilled'
-        ? toArray(bRes.value.data).map(serializarFirestore).map((b: Record<string,unknown>) => ({
-            id:           String(b.id || b['ID'] || ''),
-            nombre:       String(b.nombre || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
-            domicilio:    String(b.domicilio || b.DOMICILIO || ''),
-            horarioTurno: String(b.horarioTurno || b.HORARIO_TURNO || b['HORARIO TURNO'] || ''),
-          })).filter(b => b.id && b.nombre)
+        ? toArray(bRes.value.data).map(serializarFirestore).map((b: Record<string,unknown>) => {
+            const h = (b.horarios && typeof b.horarios === 'object') ? (b.horarios as Record<string,unknown>) : {};
+            const especiales = Array.isArray(h.horariosEspeciales) ? h.horariosEspeciales : [];
+            return {
+              id:           String(b.id || b['ID'] || ''),
+              nombre:       String(b.nombre || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
+              domicilio:    String(b.domicilio || b.DOMICILIO || ''),
+              horarioTurno: String(b.horarioTurno || b.HORARIO_TURNO || b['HORARIO TURNO'] || ''),
+              horaIngreso:  String(h.horaIngreso || b.horaIngreso || ''),
+              horaEgreso:   String(h.horaEgreso  || b.horaEgreso  || ''),
+              tieneHorariosEspeciales: (especiales as unknown[]).length > 0,
+            };
+          }).filter(b => b.id && b.nombre)
         : [];
       setDTodosB(benefs);
 
@@ -360,7 +367,7 @@ export default function AsistenciaPage() {
   const dAsignadosIds = new Set(Object.values(dAsig).flat().map(b => b.id));
 
   // Agregar beneficiario a un chofer
-  const dAgregar = (choferId: string, benef: { id:string; nombre:string; domicilio?:string; horarioTurno?:string }) => {
+  const dAgregar = (choferId: string, benef: { id:string; nombre:string; domicilio?:string; horarioTurno?:string; horaIngreso?:string; horaEgreso?:string; tieneHorariosEspeciales?:boolean }) => {
     if (dAsignadosIds.has(benef.id)) return; // ya asignado
     setDAsig(prev => ({ ...prev, [choferId]: [...(prev[choferId] || []), benef] }));
     setDBusq(p => ({ ...p, [choferId]: '' }));
@@ -1126,9 +1133,14 @@ export default function AsistenciaPage() {
                                 overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                                 {b.nombre}
                               </p>
-                              {(b.domicilio || b.horarioTurno) && (
+                              {(b.domicilio || b.horaIngreso || b.horaEgreso || b.horarioTurno) && (
                                 <p style={{ fontSize:'.72rem', color:'var(--text3)' }}>
-                                  {b.domicilio}{b.horarioTurno ? ` · 🕐 ${b.horarioTurno}` : ''}
+                                  {b.domicilio}
+                                  {(b.horaIngreso && b.horaEgreso) ? (
+                                    ` · 🕐 ${b.tieneHorariosEspeciales ? 'Variable' : `${b.horaIngreso} - ${b.horaEgreso}`}`
+                                  ) : b.horarioTurno ? (
+                                    ` · 🕐 ${b.horarioTurno}`
+                                  ) : ''}
                                 </p>
                               )}
                             </div>
@@ -1167,9 +1179,14 @@ export default function AsistenciaPage() {
                                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='transparent'}
                                 onClick={() => dAgregar(chofer.id, b)}>
                                 <p style={{ fontSize:'.85rem', fontWeight:500, color:'var(--text)' }}>{b.nombre}</p>
-                                {(b.domicilio || b.horarioTurno) && (
+                                {(b.domicilio || b.horaIngreso || b.horaEgreso || b.horarioTurno) && (
                                   <p style={{ fontSize:'.72rem', color:'var(--text3)' }}>
-                                    {b.domicilio}{b.horarioTurno ? ` · 🕐 ${b.horarioTurno}` : ''}
+                                    {b.domicilio}
+                                    {(b.horaIngreso && b.horaEgreso) ? (
+                                      ` · 🕐 ${b.tieneHorariosEspeciales ? 'Variable' : `${b.horaIngreso} - ${b.horaEgreso}`}`
+                                    ) : b.horarioTurno ? (
+                                      ` · 🕐 ${b.horarioTurno}`
+                                    ) : ''}
                                   </p>
                                 )}
                               </div>
