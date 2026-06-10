@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { signInWithEmailAndPassword, signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -20,6 +20,12 @@ const TIPOS_EMPRESA = [
 
 export default function LoginPage() {
   const [vista,      setVista]      = useState<Vista>('login');
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('mode') === 'register') {
+      setVista('registro');
+    }
+  }, []);
 
   /* ── Login ── */
   const [email,      setEmail]      = useState('');
@@ -143,13 +149,15 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <Image
-            src="/assets/logo-horizontal.png"
-            alt="Transit·Ya"
-            width={200} height={60}
-            style={{ objectFit: 'contain', margin: '0 auto', display: 'block' }}
-            priority
-          />
+          <div className="logo-beam" style={{ display: 'inline-flex', borderRadius: '10px' }}>
+            <Image
+              src="/assets/logo-horizontal.png"
+              alt="Transit·Ya"
+              width={200} height={60}
+              style={{ objectFit: 'contain', display: 'block' }}
+              priority
+            />
+          </div>
         </div>
 
         {/* ══ VISTA LOGIN ══ */}

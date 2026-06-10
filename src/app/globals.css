@@ -618,6 +618,63 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
   .btn-row .btn { width: 100%; }
 }
 
+/* ── Logo border beam ── */
+@property --logo-beam-a {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+.logo-beam {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+.logo-beam::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--logo-beam-a),
+    transparent 0%,
+    transparent 84%,
+    rgba(79,142,247,.55) 89%,
+    rgba(147,197,253,1)  93%,
+    rgba(79,142,247,.55) 97%,
+    transparent 100%
+  );
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  animation: logoBeamSpin 6s linear infinite;
+  pointer-events: none;
+}
+@keyframes logoBeamSpin { to { --logo-beam-a: 360deg; } }
+@media (prefers-reduced-motion: reduce) {
+  .logo-beam::before {
+    animation: none;
+    background: none;
+    mask: none; -webkit-mask: none;
+    border: 1.5px solid rgba(79,142,247,.2);
+    padding: 0;
+  }
+}
+
+/* ── Sidebar nav enhanced ── */
+.sidebar-nav-link { display: flex; align-items: center; gap: .6rem; text-decoration: none; transition: all 150ms cubic-bezier(.4,0,.2,1); }
+.sidebar-nav-icon { flex-shrink: 0; transition: transform 120ms ease; }
+.sidebar-nav-link:hover .sidebar-nav-icon { transform: translateX(2px); }
+.sidebar-section-label {
+  padding: .55rem 1rem .25rem;
+  font-size: .6rem; font-weight: 700;
+  color: var(--text3); letter-spacing: .12em;
+  text-transform: uppercase; opacity: .65;
+}
+
 @media print {
   /* ── Ocultar toda la UI ─────────────────────────────────────────── */
   aside,
