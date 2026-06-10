@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import PatternText from '@/components/ui/PatternText';
 
 /* ── WebGL shader sources ──────────────────────────────────────────────── */
 const VERT = `
@@ -272,15 +273,9 @@ function SplashText() {
       transform: shown ? 'translateY(0)' : 'translateY(16px)',
       transition: 'opacity .5s ease, transform .5s ease',
     }}>
-      <Image
-        src="/assets/logo-horizontal.png"
-        alt="Transit·Ya"
-        width={180} height={48}
-        style={{ objectFit: 'contain', height: 40, width: 'auto' }}
-        priority
-      />
+      <PatternText fontSize="1.85rem" tag="span">Transit·Ya</PatternText>
       <div style={{
-        fontFamily: "'Inter',sans-serif", fontSize: 12, color: '#4a6a8a',
+        fontFamily: "'Inter',sans-serif", fontSize: 11, color: '#4a6a8a',
         marginTop: 6, letterSpacing: '.12em', textTransform: 'uppercase',
       }}>
         Gestión de transporte

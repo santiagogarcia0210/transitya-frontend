@@ -244,7 +244,7 @@ export default function IngresosPage() {
           )}
 
           <div className="btn-row" style={{ marginTop:'1.25rem' }}>
-            <Button loading={saving} onClick={guardar}>
+            <Button depth loading={saving} onClick={guardar}>
               {!saving && '✓ Guardar ingreso'}
               {saving && 'Guardando…'}
             </Button>

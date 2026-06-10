@@ -327,7 +327,7 @@ export default function EgresosPage() {
           )}
 
           <div className="btn-row" style={{ marginTop:'1.25rem' }}>
-            <Button loading={saving} onClick={() => guardar(false)}>
+            <Button depth loading={saving} onClick={() => guardar(false)}>
               {!saving && '✓ Guardar egreso'}
               {saving && 'Guardando…'}
             </Button>

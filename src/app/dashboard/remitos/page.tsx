@@ -479,7 +479,7 @@ export default function RemitosPage() {
 
             <div style={{ display: 'flex', gap: '.75rem', marginTop: '1.25rem' }}>
               <Button variant="secondary" style={{ flex: 1 }} onClick={cerrarModal}>Cancelar</Button>
-              <Button style={{ flex: 1 }} loading={saving} onClick={() => guardar(false)}>
+              <Button depth style={{ flex: 1 }} loading={saving} onClick={() => guardar(false)}>
                 {!saving && (form.id ? 'Actualizar' : 'Guardar')}
                 {saving && 'Guardando…'}
               </Button>

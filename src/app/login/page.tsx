@@ -4,6 +4,9 @@ import Image from 'next/image';
 import { signInWithEmailAndPassword, signInWithCustomToken } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import FlowFieldBackground from '@/components/ui/FlowFieldBackground';
+import PatternText from '@/components/ui/PatternText';
+import Button from '@/components/ui/Button';
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL ?? '';
 
@@ -110,19 +113,25 @@ export default function LoginPage() {
 
   return (
     <div style={{
+      position: 'relative',
       minHeight: '100vh',
       background: 'var(--bg)',
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       padding: '1.5rem',
-      backgroundImage: `
-        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(59,130,246,0.18) 0%, transparent 70%),
-        linear-gradient(rgba(31,45,64,0.5) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(31,45,64,0.5) 1px, transparent 1px)
-      `,
-      backgroundSize: '100% 100%, 40px 40px, 40px 40px',
+      overflow: 'hidden',
     }}>
+      <FlowFieldBackground intensity="full" />
+      {/* Wordmark above card */}
+      <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', marginBottom: '1.5rem' }}>
+        <PatternText fontSize="2.25rem" tag="h1">Transit·Ya</PatternText>
+        <p style={{ color: 'var(--text3)', fontSize: '.78rem', marginTop: '.4rem', letterSpacing: '.06em', textTransform: 'uppercase' }}>
+          Sistema de gestión de transporte
+        </p>
+      </div>
+
       <div style={{
+        position: 'relative', zIndex: 1,
         width: '100%', maxWidth: '420px',
         background: 'var(--bg3)',
         border: '1px solid var(--border)',
@@ -179,16 +188,11 @@ export default function LoginPage() {
               </div>
             )}
 
-            <button type="submit" disabled={loading} className="btn btn-primary"
-              style={{ width: '100%', padding: '.85rem', fontSize: '.95rem', fontWeight: 600,
-                marginTop: '.25rem', boxShadow: loading ? 'none' : '0 4px 16px rgba(59,130,246,.3)' }}>
-              {loading
-                ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem' }}>
-                    <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
-                    Iniciando sesión…
-                  </span>
-                : 'Iniciar sesión'}
-            </button>
+            <Button type="submit" depth loading={loading}
+              style={{ width: '100%', padding: '.85rem', fontSize: '.95rem', fontWeight: 600, marginTop: '.25rem' }}>
+              {!loading && 'Iniciar sesión'}
+              {loading && 'Iniciando sesión…'}
+            </Button>
 
             {/* Separador */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginTop: '.25rem' }}>
@@ -299,16 +303,11 @@ export default function LoginPage() {
               </div>
             )}
 
-            <button type="submit" disabled={rLoading} className="btn btn-primary"
-              style={{ width: '100%', padding: '.85rem', fontSize: '.95rem', fontWeight: 600,
-                marginTop: '.25rem', boxShadow: rLoading ? 'none' : '0 4px 16px rgba(59,130,246,.3)' }}>
-              {rLoading
-                ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem' }}>
-                    <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
-                    Creando cuenta…
-                  </span>
-                : 'Crear cuenta →'}
-            </button>
+            <Button type="submit" depth loading={rLoading}
+              style={{ width: '100%', padding: '.85rem', fontSize: '.95rem', fontWeight: 600, marginTop: '.25rem' }}>
+              {!rLoading && 'Crear cuenta →'}
+              {rLoading && 'Creando cuenta…'}
+            </Button>
 
             <button type="button" className="btn btn-secondary"
               style={{ width: '100%' }}
@@ -319,8 +318,8 @@ export default function LoginPage() {
         )}
       </div>
 
-      <p style={{ marginTop: '1.75rem', fontSize: '.75rem', color: 'var(--text3)', textAlign: 'center' }}>
-        Transit·Ya · Sistema de gestión de transporte
+      <p style={{ position: 'relative', zIndex: 1, marginTop: '1.5rem', fontSize: '.72rem', color: 'var(--text3)', textAlign: 'center', opacity: .6 }}>
+        © 2026 Transit·Ya
       </p>
     </div>
   );
