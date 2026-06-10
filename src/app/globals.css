@@ -527,8 +527,19 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
 .req-star    { color: var(--red); margin-left: 2px; font-weight: 700; }
 
 /* ── Button extras ── */
-.btn-sm  { padding: 6px 12px; font-size: 13px; }
-.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.btn-sm   { padding: 6px 12px; font-size: 13px; }
+.btn-row  { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.btn-ghost { background: transparent; color: var(--text3); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--bg4); color: var(--text); border-color: var(--border2); }
+.btn:active:not(:disabled) { transform: scale(.96); }
+
+/* ── Modal transitions ── */
+@keyframes modalOverlayIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalContentIn  { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes modalOverlayOut { from { opacity: 1; } to { opacity: 0; } }
+.modal-overlay { animation: modalOverlayIn 160ms ease forwards; }
+.modal-overlay.closing { animation: modalOverlayOut 140ms ease forwards; }
+.modal-content { animation: modalContentIn 180ms cubic-bezier(.34,1.3,.64,1) forwards; }
 
 /* ── Stat grid ── */
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr)); gap: 12px; margin-bottom: 16px; }

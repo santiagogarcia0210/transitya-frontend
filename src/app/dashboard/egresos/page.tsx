@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import Button from '@/components/ui/Button';
 
 type TabEgr = 'carga' | 'buscar' | 'stats';
 
@@ -286,13 +287,10 @@ export default function EgresosPage() {
             <div>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'.4rem' }}>
                 <label style={L}>Comprobante</label>
-                <button type="button" className="btn btn-primary" style={{ fontSize:'.78rem', padding:'.3rem .75rem',
-                  background:'linear-gradient(135deg,#059669,#10b981)', border:'none' }}
-                  onClick={escanear} disabled={scanning}>
-                  {scanning
-                    ? <><span className="spinner" style={{width:10,height:10,borderWidth:2}}/> Escaneando…</>
-                    : '📷 Escanear con IA'}
-                </button>
+                <Button variant="success" size="sm" loading={scanning} onClick={escanear}>
+                  {!scanning && '📷 Escanear con IA'}
+                  {scanning && 'Escaneando…'}
+                </Button>
               </div>
               <input ref={fileRef} type="file" accept="image/*,application/pdf"
                 style={{ display:'none' }} onChange={onArchivo} />
@@ -329,12 +327,13 @@ export default function EgresosPage() {
           )}
 
           <div className="btn-row" style={{ marginTop:'1.25rem' }}>
-            <button className="btn btn-primary" onClick={() => guardar(false)} disabled={saving}>
-              {saving ? <><span className="spinner" style={{width:12,height:12,borderWidth:2}}/> Guardando…</> : '✓ Guardar egreso'}
-            </button>
-            <button className="btn btn-secondary" onClick={() => { setForm(EMPTY); setArchivo(null); setPreviewUrl(''); setMsgCarga(null); }}>
+            <Button loading={saving} onClick={() => guardar(false)}>
+              {!saving && '✓ Guardar egreso'}
+              {saving && 'Guardando…'}
+            </Button>
+            <Button variant="secondary" onClick={() => { setForm(EMPTY); setArchivo(null); setPreviewUrl(''); setMsgCarga(null); }}>
               Limpiar
-            </button>
+            </Button>
           </div>
         </div>
       )}

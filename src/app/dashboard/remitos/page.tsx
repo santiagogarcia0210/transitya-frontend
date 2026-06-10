@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import Button from '@/components/ui/Button';
 
 const TIPOS_COMB =['Nafta Super', 'Nafta Premium', 'Diesel', 'Gasoil', 'GNC', 'Otro'];
 
@@ -353,10 +354,11 @@ export default function RemitosPage() {
       {/* Modal */}
       {showModal && (
         <div
+          className="modal-overlay"
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', display: 'flex',
             alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}
           onClick={e => { if (e.target === e.currentTarget) cerrarModal(); }}>
-          <div className="card" style={{ width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem' }}>
+          <div className="card modal-content" style={{ width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: '1.25rem' }}>
               {form.id ? '✏️ Editar remito' : '+ Nuevo remito'}
             </h3>
@@ -431,13 +433,10 @@ export default function RemitosPage() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.4rem' }}>
                   <label style={labelStyle}>Comprobante</label>
-                  <button type="button" className="btn btn-secondary"
-                    style={{ fontSize: '.75rem', padding: '.25rem .6rem' }}
-                    onClick={escanear} disabled={scanning}>
-                    {scanning
-                      ? <><span className="spinner" style={{ width: '10px', height: '10px', borderWidth: '2px' }} /> Escaneando…</>
-                      : '🤖 Escanear con IA'}
-                  </button>
+                  <Button variant="secondary" size="sm" loading={scanning} onClick={escanear}>
+                    {!scanning && '🤖 Escanear con IA'}
+                    {scanning && 'Escaneando…'}
+                  </Button>
                 </div>
                 <input ref={fileRef} type="file" accept="image/*"
                   style={{ display: 'none' }} onChange={onArchivo} />
@@ -479,12 +478,11 @@ export default function RemitosPage() {
             )}
 
             <div style={{ display: 'flex', gap: '.75rem', marginTop: '1.25rem' }}>
-              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={cerrarModal}>Cancelar</button>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => guardar(false)} disabled={saving}>
-                {saving
-                  ? <><span className="spinner" style={{ width: '12px', height: '12px', borderWidth: '2px' }} /> Guardando…</>
-                  : form.id ? 'Actualizar' : 'Guardar'}
-              </button>
+              <Button variant="secondary" style={{ flex: 1 }} onClick={cerrarModal}>Cancelar</Button>
+              <Button style={{ flex: 1 }} loading={saving} onClick={() => guardar(false)}>
+                {!saving && (form.id ? 'Actualizar' : 'Guardar')}
+                {saving && 'Guardando…'}
+              </Button>
             </div>
           </div>
         </div>

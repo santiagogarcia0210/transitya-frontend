@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import Button from '@/components/ui/Button';
 
 type TabIng = 'carga' | 'buscar' | 'stats';
 
@@ -243,11 +244,11 @@ export default function IngresosPage() {
           )}
 
           <div className="btn-row" style={{ marginTop:'1.25rem' }}>
-            <button className="btn btn-primary" onClick={guardar} disabled={saving}>
-              {saving ? <><span className="spinner" style={{width:12,height:12}}/> Guardando…</> : '✓ Guardar ingreso'}
-            </button>
-            <button className="btn btn-secondary"
-              onClick={() => { setForm(EMPTY); setMsgCarga(null); }}>Limpiar</button>
+            <Button loading={saving} onClick={guardar}>
+              {!saving && '✓ Guardar ingreso'}
+              {saving && 'Guardando…'}
+            </Button>
+            <Button variant="secondary" onClick={() => { setForm(EMPTY); setMsgCarga(null); }}>Limpiar</Button>
           </div>
         </div>
       )}
