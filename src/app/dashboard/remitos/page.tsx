@@ -40,6 +40,13 @@ const labelStyle: React.CSSProperties = {
 const fmt = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
 
+const fechaISO = (v: string) => {
+  if (!v) return '';
+  const iso = v.includes('/') ? v.split('/').reverse().join('-') : v;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+};
+
 const EMPTY: FormState = {
   id: '', fecha: '', nroRemito: '', razonSocial: '',
   cuit: '', combustible: '', tipoCombustible: '', monto: '', chofer: '', observaciones: '',
@@ -88,7 +95,12 @@ export default function RemitosPage() {
 
   useEffect(() => { cargar(); }, []);
 
-  const choferes = [...new Set(lista.map(r => r.chofer).filter(Boolean))].sort();
+  const choferes = Array.from(
+    new Map(
+      lista.map(r => r.chofer).filter(Boolean)
+        .map(c => [c.toLowerCase().split('@')[0], c])
+    ).values()
+  ).sort();
 
   const filtrados = lista.filter(r => {
     const q = filtroBusq.toLowerCase();
@@ -114,8 +126,9 @@ export default function RemitosPage() {
 
   const abrirEdicion = (r: Remito) => {
     setForm({
-      id: r.id, fecha: r.fecha, nroRemito: r.nroRemito, razonSocial: r.razonSocial,
-      cuit: r.cuit, combustible: String(r.combustible), tipoCombustible: r.tipoCombustible,
+      id: r.id, fecha: fechaISO(r.fecha), nroRemito: r.nroRemito, razonSocial: r.razonSocial,
+      cuit: r.cuit, combustible: String(r.combustible),
+      tipoCombustible: r.tipoCombustible || '',
       monto: String(r.monto), chofer: r.chofer, observaciones: r.observaciones,
     });
     setArchivo(null); setPreviewUrl(r.comprobante || '');

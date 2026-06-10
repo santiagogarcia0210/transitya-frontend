@@ -27,14 +27,22 @@ function normalizar(e: Record<string, unknown>): Egreso {
     id:           String(e.id || ''),
     fecha:        String(e.fecha        || e.FECHA        || ''),
     concepto:     String(e.concepto     || e.CONCEPTO     || ''),
-    monto:        Number(e.monto        || e.MONTO        || e.IMPORTE || e.TOTAL || 0),
+    monto:        parseFloat(String(e.monto || e.MONTO || e.IMPORTE || e.TOTAL || 0)) || 0,
     categoria:    String(e.categoria    || e.CATEGORIA    || 'Otro'),
     proveedor:    String(e.proveedor    || e.PROVEEDOR    || e.COMERCIO || ''),
     chofer:       String(e.chofer       || e.CHOFER       || e.USUARIO  || ''),
     observaciones:String(e.observaciones|| e.OBSERVACIONES|| ''),
-    comprobante:  String(e.comprobante  || e.COMPROBANTE  || ''),
+    comprobante:  String(e.comprobanteUrl || e.COMPROBANTEURL || e.comprobante || e.COMPROBANTE || ''),
   };
 }
+
+const toBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 const L: React.CSSProperties = {
   display: 'block', fontSize: '.78rem', color: 'var(--text3)', marginBottom: '.3rem', fontWeight: 500,
@@ -42,6 +50,13 @@ const L: React.CSSProperties = {
 
 const fmt = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+
+const fechaISO = (v: string) => {
+  if (!v) return '';
+  const iso = v.includes('/') ? v.split('/').reverse().join('-') : v;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+};
 
 export default function EgresosPage() {
   const [tab,            setTab]            = useState<TabEgr>('carga');
@@ -86,7 +101,12 @@ export default function EgresosPage() {
 
   useEffect(() => { cargar(); }, []);
 
-  const choferes = [...new Set(lista.map(e => e.chofer).filter(Boolean))].sort();
+  const choferes = Array.from(
+    new Map(
+      lista.map(e => e.chofer).filter(Boolean)
+        .map(c => [c.toLowerCase().split('@')[0], c])
+    ).values()
+  ).sort();
 
   /* ── Filtrado para búsqueda ── */
   const filtrados = lista.filter(e => {
@@ -156,14 +176,9 @@ export default function EgresosPage() {
     }
     setSaving(true); setMsgCarga(null);
     try {
-      let payload: FormData | Record<string, string>;
+      const payload: Record<string, unknown> = { ...form };
       if (archivo) {
-        const fd = new FormData();
-        (Object.entries(form) as [string, string][]).forEach(([k, v]) => fd.append(k, v));
-        fd.append('comprobante', archivo);
-        payload = fd;
-      } else {
-        payload = { ...form };
+        payload.comprobante = await toBase64(archivo);
       }
       if (form.id) {
         await api.put(`/api/egresos/${form.id}`, payload);
@@ -186,8 +201,12 @@ export default function EgresosPage() {
   /* ── Stats ── */
   const egresosDelMes = lista.filter(e => {
     if (!e.fecha) return false;
-    const d = new Date(e.fecha.includes('/') ? e.fecha.split('/').reverse().join('-') : e.fecha);
-    return d.getMonth() === statsMes && d.getFullYear() === statsAnio;
+    let iso = e.fecha;
+    if (iso.includes('/')) {
+      const [dd, mm, yy] = iso.split('/');
+      iso = `${(yy||'').padStart(4,'0')}-${(mm||'').padStart(2,'0')}-${(dd||'').padStart(2,'0')}`;
+    }
+    return iso.startsWith(`${statsAnio}-${String(statsMes + 1).padStart(2,'0')}`);
   });
 
   const porCategoria = CATEGORIAS.map(cat => ({
@@ -398,14 +417,17 @@ export default function EgresosPage() {
                         </div>
                         {e.comprobante && (
                           <img src={e.comprobante} alt="comprobante"
-                            style={{ marginTop:6, maxHeight:56, maxWidth:80, borderRadius:4, border:'1px solid var(--border)', objectFit:'cover' }}
+                            style={{ marginTop:6, width:44, height:44, borderRadius:4, border:'1px solid var(--border)', objectFit:'cover', cursor:'pointer', flexShrink:0 }}
+                            onClick={ev => { ev.stopPropagation(); window.open(e.comprobante, '_blank'); }}
                             onError={ev => (ev.currentTarget.style.display='none')} />
                         )}
                       </div>
                       <div className="result-actions" style={{ display:'flex', flexDirection:'column', gap:4 }}>
                         <button className="btn btn-secondary btn-sm"
                           onClick={() => {
-                            setForm({ id:e.id, fecha:e.fecha, concepto:e.concepto, monto:String(e.monto),
+                            setForm({ id:e.id, fecha:fechaISO(e.fecha),
+                              concepto:e.concepto || '',
+                              monto:String(Math.round(parseFloat(String(e.monto || 0)))),
                               categoria:e.categoria, proveedor:e.proveedor, chofer:e.chofer, observaciones:e.observaciones });
                             setPreviewUrl(e.comprobante||''); setArchivo(null); setTab('carga');
                           }}>✏ Editar</button>
@@ -456,7 +478,7 @@ export default function EgresosPage() {
               <div className="tablero" style={{ gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', marginBottom:'1.25rem' }}>
                 <div className="tablero-card red">
                   <div className="tablero-label">Total del mes</div>
-                  <div className="tablero-value">{fmt(totalMes)}</div>
+                  <div className="tablero-value" style={{ whiteSpace:'nowrap', fontSize:'clamp(14px,2vw,22px)' }}>{fmt(totalMes)}</div>
                   <div className="tablero-sub">{egresosDelMes.length} egresos</div>
                 </div>
                 {porCategoria.slice(0,3).map(c => (

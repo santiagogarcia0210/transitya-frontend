@@ -28,7 +28,7 @@ function normalizar(e: Record<string, unknown>): Ingreso {
     fecha:        String(e.fecha        || e.FECHA        || ''),
     nroFactura:   String(e.nroFactura   || e.NROFACTURA   || e['NRO FACTURA'] || ''),
     concepto:     String(e.concepto     || e.CONCEPTO     || e.descripcion    || ''),
-    monto:        Number(e.monto        || e.MONTO        || 0),
+    monto:        parseFloat(String(e.monto || e.MONTO || 0)) || 0,
     obraSocial:   String(e.obraSocial   || e.OBRASOCIAL   || e['OBRA SOCIAL'] || ''),
     estado:       String(e.estado       || e.ESTADO       || 'PRESENTADO').toUpperCase(),
     observaciones:String(e.observaciones|| e.OBSERVACIONES|| ''),
@@ -41,6 +41,13 @@ const L: React.CSSProperties = {
 
 const fmt = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+
+const formatFecha = (f: string) => {
+  if (!f) return '';
+  const iso = f.includes('/') ? f.split('/').reverse().join('-') : f;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? f : d.toLocaleDateString('es-AR');
+};
 
 export default function IngresosPage() {
   const [tab,          setTab]          = useState<TabIng>('carga');
@@ -307,7 +314,7 @@ export default function IngresosPage() {
                           <span style={{ fontWeight:700, color:'var(--green)' }}>{fmt(e.monto)}</span>
                         </div>
                         <div className="result-meta">
-                          {e.fecha       && <span>{e.fecha}</span>}
+                          {e.fecha       && <span>{formatFecha(e.fecha)}</span>}
                           <span className={`badge ${e.estado==='PAGADO'?'badge-green':'badge-amber'}`}>{e.estado}</span>
                           {e.obraSocial  && <span>{e.obraSocial}</span>}
                           {e.nroFactura  && <span>Fact. {e.nroFactura}</span>}

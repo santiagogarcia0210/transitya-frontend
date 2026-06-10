@@ -341,14 +341,18 @@ export default function DashboardPage() {
       const r = await api.get('/api/ubicaciones');
       // Backend returns { ok, ubicaciones: [...] }
       const lista = r.data?.ubicaciones ?? toArray(r.data);
-      setUbicaciones(lista.map(serializarFirestore).map((u:Record<string,unknown>)=>({
+      const todas: UbicChofer[] = lista.map(serializarFirestore).map((u:Record<string,unknown>)=>({
         nombre:  str(u.nombre||u.NOMBRE||u.usuario||''),
         vehiculo:str(u.vehiculo||u.VEHICULO||''),
         lat:     num(u.lat||u.LAT||0),
         lng:     num(u.lng||u.LNG||u.lon||0),
         hace:    str(u.hace||u.tiempoDesde||''),
         online:  Boolean(u.online??u.activo??false),
-      })));
+      }));
+      const unicas: UbicChofer[] = Array.from(
+        new Map(todas.map((u: UbicChofer) => [u.nombre.toLowerCase().split('@')[0], u])).values()
+      );
+      setUbicaciones(unicas);
     } catch { /* sin mapa */ }
   };
 
@@ -496,7 +500,7 @@ export default function DashboardPage() {
           { id:'t-bajas',   label:'Bajas del mes',          value:String(tab.bajasMes),            color:'red',   sub:'' },
           { id:'t-egresos', label:'Gasto del mes',          value:fmtK(tab.totalEgresosMes),       color:'amber', sub:`${tab.egresosMes} registros` },
           { id:'t-ingresos',label:'Facturado pagado',       value:fmtK(tab.totalPagadoMes),        color:'green', sub:`Presentado: ${fmtK(tab.totalPresentadoMes)}` },
-          { id:'t-km',      label:'KM del mes',             value:tab.kmMes>0?tab.kmMes.toLocaleString('es-AR')+'km':'—', color:'purple', sub: tab.combustibleMes>0?`${tab.combustibleMes.toFixed(0)} L`:'' },
+          { id:'t-km',      label:'KM del mes',             value:tab.kmMes>0?tab.kmMes.toLocaleString('es-AR')+' km':'—', color:'purple', sub: tab.combustibleMes>0?`${tab.combustibleMes.toFixed(0)} L`:'' },
         ].map(k => (
           <div key={k.id} className={`tablero-card ${k.color}`}>
             <div className="tablero-label">{k.label}</div>
