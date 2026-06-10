@@ -7,6 +7,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   loading?: boolean;
   size?: 'sm' | 'md';
+  depth?: boolean;
 }
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
@@ -26,11 +27,12 @@ const Spinner = ({ size = 12 }: { size?: number }) => (
 );
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', loading = false, size, disabled, children, className = '', style, ...rest }, ref) => {
+  ({ variant = 'primary', loading = false, size, depth = false, disabled, children, className = '', style, ...rest }, ref) => {
     const cls = [
       'btn',
       VARIANT_CLASS[variant],
       size === 'sm' ? 'btn-sm' : '',
+      depth ? 'btn-depth' : '',
       className,
     ].filter(Boolean).join(' ');
 
