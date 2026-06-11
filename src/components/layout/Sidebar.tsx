@@ -96,7 +96,7 @@ export default function Sidebar() {
 
   return (
     <>
-    <aside style={{
+    <aside className="dashboard-sidebar" style={{
       width: '220px', minHeight: '100vh', flexShrink: 0,
       background: 'var(--bg2)', borderRight: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column',

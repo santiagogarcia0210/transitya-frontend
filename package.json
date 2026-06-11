@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
+    "@tabler/icons-react": "^3.44.0",
     "@tanstack/react-query": "^5.100.14",
     "@types/leaflet": "^1.9.21",
     "axios": "^1.16.1",

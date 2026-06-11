@@ -681,6 +681,123 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
   text-transform: uppercase; opacity: .65;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   BOTTOM NAVIGATION — mobile carousel
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Hidden on desktop — sidebar handles navigation */
+.bnav { display: none; }
+
+@media (max-width: 768px) {
+  /* Hide sidebar on mobile */
+  .dashboard-sidebar { display: none !important; }
+
+  /* Add bottom padding so content isn't hidden behind nav */
+  .dashboard-main { padding-bottom: 100px !important; }
+
+  /* Show bottom nav */
+  .bnav {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 28px);
+    max-width: 420px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-xl);
+    padding: 10px 0 8px;
+    z-index: 100;
+    box-shadow: 0 8px 32px rgba(0,0,0,.45), 0 0 0 1px rgba(108,95,255,.12);
+    backdrop-filter: blur(12px);
+  }
+}
+
+/* ── Scrollable track ─────────────────────────────────────────────── */
+.bnav-track {
+  display: flex;
+  overflow-x: scroll;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.bnav-track::-webkit-scrollbar { display: none; }
+
+/* ── Each slide (3 buttons) ───────────────────────────────────────── */
+.bnav-slide {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  min-width: 100%;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  padding: 0 10px;
+  gap: 4px;
+}
+
+/* ── Individual button ────────────────────────────────────────────── */
+.bnav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 9px 6px 7px;
+  border-radius: var(--radius);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text3);
+  font-family: var(--font);
+  transition: color 150ms ease, background 150ms ease;
+}
+.bnav-btn:active { transform: scale(0.95); transition: transform 150ms ease; }
+.bnav-active {
+  color: var(--purple);
+  background: var(--purple-dim);
+}
+.bnav-btn:hover:not(.bnav-active) {
+  color: var(--text2);
+  background: rgba(108,95,255,.08);
+}
+
+.bnav-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 76px;
+}
+
+/* ── Dot indicators ───────────────────────────────────────────────── */
+.bnav-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 0 2px;
+}
+.bnav-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border2);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 250ms ease, width 250ms ease;
+}
+.bnav-dot-active {
+  background: var(--purple);
+  width: 20px;
+}
+
 @media print {
   /* ── Ocultar toda la UI ─────────────────────────────────────────── */
   aside,
