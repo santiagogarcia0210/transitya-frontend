@@ -84,27 +84,26 @@ export default function AsistenciaPage() {
   }, [perfil]);
 
   const cargarHoy = useCallback(async (iso: string) => {
-    // No hay asistencia los fines de semana
     if (esFindeSemana(iso)) { setBenefHoy([]); setPresencias({}); setLoadingH(false); return; }
     setLoadingH(true); setMsgH(null);
     try {
-      const fechaES = isoToES(iso);
-      const r = await api.get(`/api/asistencia/beneficiarios?fecha=${encodeURIComponent(fechaES)}`);
-      const bens: BenefHoy[] = toArray(r.data).map(serializarFirestore).map((b: Record<string,unknown>) => ({
+      // Carga beneficiarios programados para el día de semana de la fecha elegida
+      const r = await api.get(`/api/asistencia/programados?fecha=${iso}`);
+      const bens: BenefHoy[] = toArray(r.data?.beneficiarios || []).map(serializarFirestore).map((b: Record<string,unknown>) => ({
         id:     String(b.id     || ''),
         nombre: String(b.nombre || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
         chofer: String(b.chofer || b.CHOFER || ''),
       }));
       setBenefHoy(bens);
 
-      /* Cargar estado actual del día via endpoint dedicado */
+      // Cargar marcas de presencia ya guardadas para esta fecha
       try {
-        const aRes = await api.get(`/api/asistencia/estado?fecha=${encodeURIComponent(fechaES)}`);
+        const pRes = await api.get(`/api/asistencia/presencia?fecha=${iso}`);
         const mapa: Record<string,boolean> = {};
         bens.forEach(b => { mapa[b.id] = false; });
-        toArray(aRes.data).map(serializarFirestore).forEach((a: Record<string,unknown>) => {
-          const id = String(a.beneficiarioId || a.id || '');
-          if (id in mapa) mapa[id] = a.presente !== false;
+        toArray(pRes.data?.marcas || []).map(serializarFirestore).forEach((m: Record<string,unknown>) => {
+          const id = String(m.id || '');
+          if (id in mapa) mapa[id] = m.presente === true;
         });
         setPresencias(mapa);
       } catch {
@@ -132,9 +131,8 @@ export default function AsistenciaPage() {
   const guardarAsistencia = async () => {
     setSavingH(true); setMsgH(null);
     try {
-      // Body: solo IDs de los presentes + fecha en formato GAS
-      const presentes = benefHoy.filter(b => presencias[b.id] ?? false).map(b => b.id);
-      await api.post('/api/asistencia', { fecha: isoToES(fechaISO), presentes });
+      const marcas = benefHoy.map(b => ({ id: b.id, nombre: b.nombre, presente: presencias[b.id] ?? false }));
+      await api.post('/api/asistencia/presencia', { fecha: fechaISO, marcas });
       setMsgH({ text: '✓ Asistencia guardada', ok: true });
     } catch { setMsgH({ text: 'Error al guardar', ok: false }); }
     setSavingH(false);
@@ -296,14 +294,17 @@ export default function AsistenciaPage() {
   const [dMsg,       setDMsg]       = useState<Record<string,{text:string;ok:boolean}>>({});
   // Buscador por chofer: { choferId → término }
   const [dBusq,      setDBusq]      = useState<Record<string,string>>({});
+  // Presentes del día en Asignación (cargados de asistencia_presencia, enriquecidos con dTodosB)
+  const [dPresentes, setDPresentes] = useState<{ id:string; nombre:string; domicilio?:string; horarioTurno?:string; horaIngreso?:string; horaEgreso?:string; tieneHorariosEspeciales?:boolean }[]>([]);
 
   const cargarDiaria = useCallback(async (fecha: string) => {
     setDLoading(true);
     try {
-      const [bRes, uRes, aRes] = await Promise.allSettled([
+      const [bRes, uRes, aRes, pRes] = await Promise.allSettled([
         api.get('/api/beneficiarios'),
         api.get('/api/usuarios'),
         api.get(`/api/asistencia/diaria?fecha=${fecha}`),
+        api.get(`/api/asistencia/presencia?fecha=${fecha}`),
       ]);
 
       // Beneficiarios
@@ -357,6 +358,16 @@ export default function AsistenciaPage() {
         });
       }
       setDAsig(asigInicial);
+
+      // Presentes del día: filtrar dTodosB por quienes tienen presente===true en asistencia_presencia
+      if (pRes.status === 'fulfilled') {
+        const presentesIds = new Set(
+          toArray(pRes.value.data?.presentes || []).map((p: Record<string,unknown>) => String(p.id || ''))
+        );
+        setDPresentes(benefs.filter(b => presentesIds.has(b.id)));
+      } else {
+        setDPresentes([]);
+      }
     } catch { /* silent */ }
     setDLoading(false);
   }, []);
@@ -1157,49 +1168,39 @@ export default function AsistenciaPage() {
                       </p>
                     )}
 
-                    {/* Buscador / selector para agregar */}
-                    <div style={{ display:'flex', gap:'.5rem', flexWrap:'wrap', alignItems:'flex-start' }}>
-                      <div style={{ flex:1, minWidth:200, position:'relative' }}>
-                        <input className="input" style={{ fontSize:'.82rem' }}
-                          placeholder="Buscar y agregar beneficiario…"
-                          value={busq}
-                          onChange={e => setDBusq(p => ({ ...p, [chofer.id]: e.target.value }))} />
-                        {busq && filtradosBusq.length > 0 && (
-                          <div style={{
-                            position:'absolute', top:'100%', left:0, right:0, zIndex:20,
-                            background:'var(--bg3)', border:'1px solid var(--border)',
-                            borderRadius:'var(--radius)', boxShadow:'0 8px 24px rgba(0,0,0,.3)',
-                            maxHeight:200, overflowY:'auto',
-                          }}>
-                            {filtradosBusq.slice(0,10).map(b => (
-                              <div key={b.id}
-                                style={{ padding:'.55rem .85rem', cursor:'pointer',
-                                  borderBottom:'1px solid var(--border)', transition:'background .1s' }}
-                                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background='var(--bg4)'}
-                                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background='transparent'}
-                                onClick={() => dAgregar(chofer.id, b)}>
-                                <p style={{ fontSize:'.85rem', fontWeight:500, color:'var(--text)' }}>{b.nombre}</p>
-                                {(b.domicilio || b.horaIngreso || b.horaEgreso || b.horarioTurno) && (
-                                  <p style={{ fontSize:'.72rem', color:'var(--text3)' }}>
-                                    {b.domicilio}
-                                    {(b.horaIngreso && b.horaEgreso) ? (
-                                      ` · 🕐 ${b.tieneHorariosEspeciales ? 'Variable' : `${b.horaIngreso} - ${b.horaEgreso}`}`
-                                    ) : b.horarioTurno ? (
-                                      ` · 🕐 ${b.horarioTurno}`
-                                    ) : ''}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {busq && filtradosBusq.length === 0 && (
-                          <p style={{ fontSize:'.75rem', color:'var(--text3)', marginTop:'.3rem' }}>
-                            Sin resultados{dAsignadosIds.has(busq) ? ' (ya asignado a otro chofer)' : ''}
+                    {/* Dropdown de presentes para agregar */}
+                    {(() => {
+                      const disponibles = dPresentes.filter(b => !dAsignadosIds.has(b.id));
+                      if (dPresentes.length === 0) {
+                        return (
+                          <p style={{ fontSize:'.78rem', color:'var(--text3)', fontStyle:'italic', marginTop:'.25rem' }}>
+                            ⚠ Sin presentes registrados — tomá asistencia primero en "✅ Tomar asistencia"
                           </p>
-                        )}
-                      </div>
-                    </div>
+                        );
+                      }
+                      if (disponibles.length === 0) {
+                        return (
+                          <p style={{ fontSize:'.78rem', color:'var(--green)', marginTop:'.25rem' }}>
+                            ✓ Todos los presentes ya están asignados
+                          </p>
+                        );
+                      }
+                      return (
+                        <select className="select" style={{ fontSize:'.82rem', width:'100%' }}
+                          value=""
+                          onChange={e => {
+                            const b = disponibles.find(x => x.id === e.target.value);
+                            if (b) dAgregar(chofer.id, b);
+                          }}>
+                          <option value="">+ Agregar presente…</option>
+                          {disponibles.map(b => (
+                            <option key={b.id} value={b.id}>
+                              {b.nombre}{b.horarioTurno ? ` · ${b.horarioTurno}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
                   </div>
                 );
               })}
