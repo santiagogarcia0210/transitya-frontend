@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transit·Ya — Dashboard Mockup v1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ═══════════════════════════════════════════════════════════════════
+       TRANSIT·YA — Design System v3 "Púrpura → Azul"
+       Mockup estático — Phase 1 validation
+    ═══════════════════════════════════════════════════════════════════ */
+    :root {
+      /* ── Backgrounds ─────────────────────────────────────── */
+      --bg:      #0F1729;   /* base casi-negro */
+      --bg2:     #141B33;   /* sidebar */
+      --bg3:     #1A2142;   /* content bg */
+      --surface: #232B4E;   /* cards */
+      --surface2:#2D3456;   /* cards hover / inputs */
+
+      /* ── Brand ───────────────────────────────────────────── */
+      --purple:       #6C5FFF;
+      --purple-dark:  #4B47DB;
+      --purple-dim:   rgba(108,95,255,.15);
+      --purple-glow:  rgba(108,95,255,.30);
+
+      --cyan:         #00D9FF;
+      --cyan-dim:     rgba(0,217,255,.12);
+      --cyan-glow:    rgba(0,217,255,.25);
+
+      --blue:         #3B82F6;
+      --blue-bright:  #60A5FA;
+
+      /* ── Semantic ─────────────────────────────────────────── */
+      --green:    #10B981;
+      --green-dim:rgba(16,185,129,.13);
+      --red:      #EF4444;
+      --red-dim:  rgba(239,68,68,.13);
+      --amber:    #F59E0B;
+      --amber-dim:rgba(245,158,11,.13);
+
+      /* ── Borders ─────────────────────────────────────────── */
+      --border:       rgba(108,95,255,.18);
+      --border2:      rgba(108,95,255,.30);
+      --border-light: rgba(255,255,255,.07);
+
+      /* ── Text ────────────────────────────────────────────── */
+      --text:   #FFFFFF;
+      --text2:  #B0B8D4;
+      --text3:  #6B7699;
+
+      /* ── Spacing ─────────────────────────────────────────── */
+      --sp1: .5rem;    /* 8px  */
+      --sp2: 1rem;     /* 16px */
+      --sp3: 1.5rem;   /* 24px */
+      --sp4: 2rem;     /* 32px */
+
+      /* ── Radii ───────────────────────────────────────────── */
+      --radius:    10px;
+      --radius-lg: 14px;
+      --radius-xl: 20px;
+
+      /* ── Transition ──────────────────────────────────────── */
+      --t: 160ms ease;
+
+      /* ── Typography ──────────────────────────────────────── */
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    /* ── Reset ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-family: var(--font); font-size: 14px; color: var(--text); background: var(--bg); }
+    body { min-height: 100dvh; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       SECTION HEADERS (for mockup annotation only)
+    ═══════════════════════════════════════════════════════════════ */
+    .mockup-label {
+      font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--text3); margin-bottom: var(--sp2); padding: 4px 8px;
+      background: rgba(255,255,255,.04); border-radius: 4px; display: inline-block;
+    }
+    .mockup-section {
+      padding: var(--sp4);
+      border-bottom: 1px dashed rgba(255,255,255,.06);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       DESIGN SYSTEM PALETTE PREVIEW
+    ═══════════════════════════════════════════════════════════════ */
+    .palette-grid {
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .swatch {
+      width: 72px; text-align: center;
+    }
+    .swatch-color {
+      height: 40px; border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,.1);
+    }
+    .swatch-label {
+      font-size: 10px; color: var(--text3); margin-top: 4px; line-height: 1.3;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       BUTTON COMPONENT
+    ═══════════════════════════════════════════════════════════════ */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 18px; border-radius: var(--radius);
+      font-size: 14px; font-weight: 500; cursor: pointer; border: none;
+      transition: background var(--t), transform var(--t), box-shadow var(--t);
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: var(--purple);
+      color: #fff;
+      box-shadow: 0 4px 16px var(--purple-glow);
+    }
+    .btn-primary:hover {
+      background: var(--purple-dark);
+      transform: scale(1.02);
+      box-shadow: 0 6px 20px var(--purple-glow);
+    }
+    .btn-primary:active { transform: scale(.97); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover {
+      background: var(--purple-dim);
+      border-color: var(--border2);
+      color: var(--text);
+    }
+
+    .btn-cyan {
+      background: var(--cyan);
+      color: #0F1729;
+      font-weight: 600;
+      box-shadow: 0 4px 16px var(--cyan-glow);
+    }
+    .btn-cyan:hover { filter: brightness(1.1); transform: scale(1.02); }
+
+    /* ═══════════════════════════════════════════════════════════════
+       CARD COMPONENT
+    ═══════════════════════════════════════════════════════════════ */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--sp2);
+    }
+    .card:hover {
+      border-color: var(--border2);
+      background: var(--surface2);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       INPUT COMPONENT
+    ═══════════════════════════════════════════════════════════════ */
+    .input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 9px 12px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color var(--t);
+      width: 220px;
+    }
+    .input:focus {
+      border-color: var(--purple);
+      box-shadow: 0 0 0 3px var(--purple-dim);
+    }
+    .input::placeholder { color: var(--text3); }
+
+    /* ═══════════════════════════════════════════════════════════════
+       SIDEBAR (desktop nav)
+    ═══════════════════════════════════════════════════════════════ */
+    .sidebar {
+      width: 240px; min-width: 240px;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: var(--sp3) 0;
+      height: 100vh; position: sticky; top: 0;
+    }
+    .sidebar-logo {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 var(--sp2) var(--sp3);
+      border-bottom: 1px solid var(--border-light);
+      margin-bottom: var(--sp2);
+    }
+    .logo-mark {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .logo-name {
+      font-size: 15px; font-weight: 600; color: var(--text);
+      letter-spacing: -.02em;
+    }
+    .logo-name span { color: var(--cyan); }
+
+    .nav-section-label {
+      font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--text3); padding: var(--sp1) var(--sp2);
+      margin-top: var(--sp1);
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px var(--sp2); margin: 1px var(--sp1);
+      border-radius: var(--radius);
+      color: var(--text2); font-size: 14px; font-weight: 500;
+      cursor: pointer;
+      transition: background var(--t), color var(--t), border-color var(--t);
+      border: 1px solid transparent;
+      text-decoration: none;
+    }
+    .nav-item:hover {
+      background: var(--purple-dim);
+      color: var(--text);
+    }
+    .nav-item.active {
+      background: var(--purple-dim);
+      color: var(--purple);
+      border-color: var(--purple-dim);
+    }
+    .nav-item.active .nav-icon { color: var(--purple); }
+    .nav-icon {
+      width: 18px; height: 18px; flex-shrink: 0;
+      transition: transform var(--t);
+    }
+    .nav-item:hover .nav-icon { transform: translateX(2px); }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: var(--sp2);
+      border-top: 1px solid var(--border-light);
+    }
+    .sidebar-user {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px;
+    }
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 600; color: #fff;
+      flex-shrink: 0;
+    }
+    .user-name { font-size: 13px; font-weight: 500; color: var(--text); }
+    .user-role { font-size: 11px; color: var(--text3); }
+
+    /* ═══════════════════════════════════════════════════════════════
+       MAIN CONTENT
+    ═══════════════════════════════════════════════════════════════ */
+    .dashboard-layout {
+      display: flex; min-height: 100vh;
+    }
+    .main-content {
+      flex: 1; padding: var(--sp3); background: var(--bg3);
+      overflow-y: auto;
+    }
+    .page-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: var(--sp3);
+    }
+    .page-title {
+      font-size: 20px; font-weight: 600; color: var(--text);
+      letter-spacing: -.02em;
+    }
+    .page-subtitle {
+      font-size: 13px; color: var(--text3); margin-top: 2px;
+    }
+    .header-actions { display: flex; gap: 8px; }
+
+    /* ── KPI Grid ──────────────────────────────────────────────── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: var(--sp3);
+    }
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--sp2) var(--sp2) var(--sp2);
+      display: flex; flex-direction: column; gap: 8px;
+      transition: border-color var(--t), background var(--t), transform var(--t);
+      cursor: default;
+      position: relative; overflow: hidden;
+    }
+    .kpi-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, var(--accent-dim, transparent), transparent 60%);
+      pointer-events: none;
+    }
+    .kpi-card:hover {
+      border-color: var(--border2);
+      transform: translateY(-2px);
+    }
+    .kpi-header {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .kpi-label {
+      font-size: 12px; font-weight: 400; color: var(--text3);
+      text-transform: uppercase; letter-spacing: .05em;
+    }
+    .kpi-icon-wrap {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .kpi-number {
+      font-size: 40px; font-weight: 700; line-height: 1;
+      letter-spacing: -.03em;
+    }
+    .kpi-meta {
+      font-size: 12px; color: var(--text3); display: flex; align-items: center; gap: 4px;
+    }
+    .kpi-delta {
+      font-size: 11px; font-weight: 500;
+      padding: 2px 6px; border-radius: 999px;
+    }
+    .delta-up   { background: var(--green-dim); color: var(--green); }
+    .delta-down { background: var(--red-dim);   color: var(--red);   }
+
+    /* KPI color variants */
+    .kpi-purple { --accent-dim: var(--purple-dim); }
+    .kpi-purple .kpi-number { color: var(--purple); }
+    .kpi-purple .kpi-icon-wrap { background: var(--purple-dim); color: var(--purple); }
+    .kpi-purple:hover { border-color: rgba(108,95,255,.4); }
+
+    .kpi-cyan { --accent-dim: var(--cyan-dim); }
+    .kpi-cyan .kpi-number { color: var(--cyan); }
+    .kpi-cyan .kpi-icon-wrap { background: var(--cyan-dim); color: var(--cyan); }
+    .kpi-cyan:hover { border-color: rgba(0,217,255,.35); }
+
+    .kpi-green .kpi-number { color: var(--green); }
+    .kpi-green .kpi-icon-wrap { background: var(--green-dim); color: var(--green); }
+
+    .kpi-amber .kpi-number { color: var(--amber); }
+    .kpi-amber .kpi-icon-wrap { background: var(--amber-dim); color: var(--amber); }
+
+    /* ── Content Grid ─────────────────────────────────────────── */
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 12px;
+    }
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--sp2);
+    }
+    .chart-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: var(--sp2);
+    }
+    .chart-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .chart-placeholder {
+      background: var(--surface2);
+      border-radius: var(--radius);
+      height: 200px;
+      display: flex; align-items: flex-end;
+      padding: 12px; gap: 8px;
+    }
+    .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .bar {
+      width: 100%; border-radius: 4px 4px 0 0;
+      background: linear-gradient(to top, var(--purple), var(--cyan));
+      opacity: .75; transition: opacity var(--t);
+    }
+    .bar:hover { opacity: 1; }
+    .bar-label { font-size: 10px; color: var(--text3); }
+
+    /* ── Activity List ─────────────────────────────────────────── */
+    .activity-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .activity-text { font-size: 13px; color: var(--text2); flex: 1; }
+    .activity-time { font-size: 11px; color: var(--text3); }
+
+    /* ═══════════════════════════════════════════════════════════════
+       BOTTOM NAV (mobile — shown below dashboard in mockup)
+    ═══════════════════════════════════════════════════════════════ */
+    .mobile-frame {
+      width: 390px; margin: 0 auto;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      position: relative;
+    }
+    .mobile-screen {
+      background: var(--bg3);
+      height: 320px;
+      display: flex; flex-direction: column;
+      padding: var(--sp2);
+    }
+    .mobile-header {
+      font-size: 16px; font-weight: 600; color: var(--text);
+      margin-bottom: var(--sp1);
+    }
+    .mobile-kpi-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: var(--sp1);
+    }
+    .mobile-kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+    }
+    .mobile-kpi-num { font-size: 28px; font-weight: 700; }
+    .mobile-kpi-label { font-size: 11px; color: var(--text3); }
+
+    /* Bottom navigation bar */
+    .bottom-nav {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      display: flex; justify-content: space-around; align-items: center;
+      padding: 10px 0 14px;
+    }
+    .bnav-item {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 4px 10px; border-radius: 10px;
+      cursor: pointer;
+      color: var(--text3);
+      font-size: 11px; font-weight: 500;
+      transition: color var(--t), background var(--t), transform var(--t);
+      min-width: 56px; text-align: center;
+    }
+    .bnav-item:hover { color: var(--text); background: var(--purple-dim); }
+    .bnav-item.active {
+      color: var(--purple);
+      background: var(--purple-dim);
+    }
+    .bnav-item:active { transform: scale(.93); }
+    .bnav-icon { width: 22px; height: 22px; }
+
+    /* ── Pill indicator for active bnav ───────────────────────── */
+    .bnav-item.active .bnav-icon-wrap {
+      position: relative;
+    }
+    .bnav-item.active .bnav-icon-wrap::after {
+      content: '';
+      position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+      width: 4px; height: 4px; border-radius: 50%;
+      background: var(--purple);
+    }
+    .bnav-icon-wrap { position: relative; display: inline-flex; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       MOCKUP PAGE LAYOUT
+    ═══════════════════════════════════════════════════════════════ */
+    .page-sections {
+      max-width: 1200px; margin: 0 auto; padding: var(--sp4);
+      display: flex; flex-direction: column; gap: var(--sp4);
+    }
+    .section-title {
+      font-size: 18px; font-weight: 600; color: var(--text);
+      margin-bottom: var(--sp2);
+    }
+    .section-subtitle {
+      font-size: 12px; color: var(--text3);
+      margin-bottom: var(--sp3); margin-top: -var(--sp1);
+    }
+    .component-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     § 1 — DESIGN TOKENS
+════════════════════════════════════════════════════════════════ -->
+<div class="page-sections">
+
+<section>
+  <div class="mockup-label">§ 1 — Design Tokens</div>
+  <h2 class="section-title">Paleta de colores</h2>
+
+  <div class="palette-grid">
+    <div class="swatch"><div class="swatch-color" style="background:#6C5FFF"></div><div class="swatch-label">--purple<br>#6C5FFF</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#4B47DB"></div><div class="swatch-label">--purple-dark<br>#4B47DB</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#00D9FF"></div><div class="swatch-label">--cyan<br>#00D9FF</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#3B82F6"></div><div class="swatch-label">--blue<br>#3B82F6</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#0F1729"></div><div class="swatch-label">--bg<br>#0F1729</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#141B33"></div><div class="swatch-label">--bg2<br>#141B33</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#1A2142"></div><div class="swatch-label">--bg3<br>#1A2142</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#232B4E"></div><div class="swatch-label">--surface<br>#232B4E</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#2D3456"></div><div class="swatch-label">--surface2<br>#2D3456</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#10B981"></div><div class="swatch-label">--green<br>#10B981</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#EF4444"></div><div class="swatch-label">--red<br>#EF4444</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#F59E0B"></div><div class="swatch-label">--amber<br>#F59E0B</div></div>
+  </div>
+</section>
+
+<!-- ── § 2 Components ─────────────────────────────────────────── -->
+<section>
+  <div class="mockup-label">§ 2 — Components</div>
+  <h2 class="section-title">Buttons &amp; Inputs</h2>
+  <div class="component-row">
+    <button class="btn btn-primary">
+      <svg class="bnav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+      Acción principal
+    </button>
+    <button class="btn btn-ghost">Cancelar</button>
+    <button class="btn btn-cyan">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+      Cyan accent
+    </button>
+    <input class="input" placeholder="Buscar chofer..." />
+  </div>
+</section>
+
+<!-- ── § 3 KPI Cards ──────────────────────────────────────────── -->
+<section>
+  <div class="mockup-label">§ 3 — KPI Cards</div>
+  <h2 class="section-title">Cards KPI (4 variantes)</h2>
+  <div class="kpi-grid">
+
+    <!-- Km totales -->
+    <div class="card kpi-card kpi-purple">
+      <div class="kpi-header">
+        <span class="kpi-label">Km totales hoy</span>
+        <span class="kpi-icon-wrap">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+          </svg>
+        </span>
+      </div>
+      <div class="kpi-number">145</div>
+      <div class="kpi-meta">
+        <span class="kpi-delta delta-up">+12%</span>
+        vs. ayer
+      </div>
+    </div>
+
+    <!-- Choferes activos -->
+    <div class="card kpi-card kpi-cyan">
+      <div class="kpi-header">
+        <span class="kpi-label">Choferes activos</span>
+        <span class="kpi-icon-wrap">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </span>
+      </div>
+      <div class="kpi-number">8</div>
+      <div class="kpi-meta">
+        <span class="kpi-delta delta-up">+2</span>
+        en ruta
+      </div>
+    </div>
+
+    <!-- Rutas completadas -->
+    <div class="card kpi-card kpi-green">
+      <div class="kpi-header">
+        <span class="kpi-label">Rutas completadas</span>
+        <span class="kpi-icon-wrap">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>
+          </svg>
+        </span>
+      </div>
+      <div class="kpi-number">12</div>
+      <div class="kpi-meta">
+        <span class="kpi-delta delta-up">+3</span>
+        hoy
+      </div>
+    </div>
+
+    <!-- Remitos pendientes -->
+    <div class="card kpi-card kpi-amber">
+      <div class="kpi-header">
+        <span class="kpi-label">Remitos pendientes</span>
+        <span class="kpi-icon-wrap">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/>
+          </svg>
+        </span>
+      </div>
+      <div class="kpi-number">3</div>
+      <div class="kpi-meta">
+        <span class="kpi-delta delta-down">-1</span>
+        vs. ayer
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── § 4 Dashboard layout (desktop) ────────────────────────── -->
+<section>
+  <div class="mockup-label">§ 4 — Dashboard Desktop</div>
+  <h2 class="section-title">Layout completo</h2>
+
+  <div class="dashboard-layout" style="border-radius:var(--radius-xl); overflow:hidden; border:1px solid var(--border); min-height:580px;">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-mark">T</div>
+        <div>
+          <div class="logo-name">Transit<span>·Ya</span></div>
+        </div>
+      </div>
+
+      <div class="nav-section-label">General</div>
+
+      <a class="nav-item active" href="#">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>
+        </svg>
+        Inicio
+      </a>
+      <a class="nav-item" href="#">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        Reportes
+      </a>
+      <a class="nav-item" href="#">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>
+        </svg>
+        Asistencia
+      </a>
+      <a class="nav-item" href="#">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        Choferes
+      </a>
+
+      <div class="nav-section-label" style="margin-top:auto"></div>
+
+      <a class="nav-item" href="#">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+        Perfil
+      </a>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="avatar">SG</div>
+          <div>
+            <div class="user-name">Santiago García</div>
+            <div class="user-role">Administrador</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main-content">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Buen día, Santiago</div>
+          <div class="page-subtitle">Miércoles, 11 de junio de 2026</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost" style="font-size:13px;padding:7px 14px;">Exportar</button>
+          <button class="btn btn-primary" style="font-size:13px;padding:7px 14px;">+ Nueva ruta</button>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-grid">
+        <div class="card kpi-card kpi-purple">
+          <div class="kpi-header"><span class="kpi-label">Km totales hoy</span>
+            <span class="kpi-icon-wrap"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></span>
+          </div>
+          <div class="kpi-number">145</div>
+          <div class="kpi-meta"><span class="kpi-delta delta-up">+12%</span>vs. ayer</div>
+        </div>
+        <div class="card kpi-card kpi-cyan">
+          <div class="kpi-header"><span class="kpi-label">Choferes activos</span>
+            <span class="kpi-icon-wrap"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span>
+          </div>
+          <div class="kpi-number">8</div>
+          <div class="kpi-meta"><span class="kpi-delta delta-up">+2</span>en ruta</div>
+        </div>
+        <div class="card kpi-card kpi-green">
+          <div class="kpi-header"><span class="kpi-label">Rutas completadas</span>
+            <span class="kpi-icon-wrap"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg></span>
+          </div>
+          <div class="kpi-number">12</div>
+          <div class="kpi-meta"><span class="kpi-delta delta-up">+3</span>hoy</div>
+        </div>
+        <div class="card kpi-card kpi-amber">
+          <div class="kpi-header"><span class="kpi-label">Remitos pendientes</span>
+            <span class="kpi-icon-wrap"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+          </div>
+          <div class="kpi-number">3</div>
+          <div class="kpi-meta"><span class="kpi-delta delta-down">-1</span>vs. ayer</div>
+        </div>
+      </div>
+
+      <!-- Content grid -->
+      <div class="content-grid">
+        <!-- Chart -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <span class="chart-title">Km por día — esta semana</span>
+            <span style="font-size:11px;color:var(--text3)">Jun 2–8</span>
+          </div>
+          <div class="chart-placeholder">
+            <div class="bar-wrap"><div class="bar" style="height:55%"></div><span class="bar-label">L</span></div>
+            <div class="bar-wrap"><div class="bar" style="height:80%"></div><span class="bar-label">M</span></div>
+            <div class="bar-wrap"><div class="bar" style="height:65%"></div><span class="bar-label">X</span></div>
+            <div class="bar-wrap"><div class="bar" style="height:90%"></div><span class="bar-label">J</span></div>
+            <div class="bar-wrap"><div class="bar" style="height:70%"></div><span class="bar-label">V</span></div>
+            <div class="bar-wrap"><div class="bar" style="height:40%"></div><span class="bar-label">S</span></div>
+            <div class="bar-wrap"><div class="bar" style="height:25%"></div><span class="bar-label">D</span></div>
+          </div>
+        </div>
+
+        <!-- Activity -->
+        <div class="chart-card">
+          <div class="chart-header"><span class="chart-title">Actividad reciente</span></div>
+          <div class="activity-item">
+            <div class="activity-dot" style="background:var(--green)"></div>
+            <span class="activity-text">Ruta 4 — completada</span>
+            <span class="activity-time">08:42</span>
+          </div>
+          <div class="activity-item">
+            <div class="activity-dot" style="background:var(--cyan)"></div>
+            <span class="activity-text">Carlos M. inició ruta 7</span>
+            <span class="activity-time">08:15</span>
+          </div>
+          <div class="activity-item">
+            <div class="activity-dot" style="background:var(--amber)"></div>
+            <span class="activity-text">Remito #210 pendiente</span>
+            <span class="activity-time">07:58</span>
+          </div>
+          <div class="activity-item">
+            <div class="activity-dot" style="background:var(--purple)"></div>
+            <span class="activity-text">3 choferes marcaron asistencia</span>
+            <span class="activity-time">07:30</span>
+          </div>
+          <div class="activity-item">
+            <div class="activity-dot" style="background:var(--red)"></div>
+            <span class="activity-text">Ruta 2 — demora registrada</span>
+            <span class="activity-time">07:10</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+  </div>
+</section>
+
+<!-- ── § 5 Mobile Bottom Nav ──────────────────────────────────── -->
+<section>
+  <div class="mockup-label">§ 5 — Mobile / Bottom Navigation</div>
+  <h2 class="section-title">Vista mobile (390px)</h2>
+  <p style="font-size:13px;color:var(--text3);margin-bottom:var(--sp2);">Bottom nav horizontal fijo en la parte inferior. 5 items equidistantes, tap feedback color+scale.</p>
+
+  <div class="mobile-frame">
+    <div class="mobile-screen">
+      <div class="mobile-header">Buen día, Santiago</div>
+      <div class="mobile-kpi-row">
+        <div class="mobile-kpi kpi-purple">
+          <div class="mobile-kpi-num" style="color:var(--purple)">145</div>
+          <div class="mobile-kpi-label">Km totales hoy</div>
+        </div>
+        <div class="mobile-kpi kpi-cyan">
+          <div class="mobile-kpi-num" style="color:var(--cyan)">8</div>
+          <div class="mobile-kpi-label">Choferes activos</div>
+        </div>
+      </div>
+      <div class="mobile-kpi-row">
+        <div class="mobile-kpi kpi-green">
+          <div class="mobile-kpi-num" style="color:var(--green)">12</div>
+          <div class="mobile-kpi-label">Rutas completadas</div>
+        </div>
+        <div class="mobile-kpi kpi-amber">
+          <div class="mobile-kpi-num" style="color:var(--amber)">3</div>
+          <div class="mobile-kpi-label">Remitos pendientes</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Nav -->
+    <nav class="bottom-nav">
+
+      <!-- Home -->
+      <div class="bnav-item active">
+        <div class="bnav-icon-wrap">
+          <svg class="bnav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>
+          </svg>
+        </div>
+        <span>Inicio</span>
+      </div>
+
+      <!-- Reportes -->
+      <div class="bnav-item">
+        <div class="bnav-icon-wrap">
+          <svg class="bnav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+        </div>
+        <span>Reportes</span>
+      </div>
+
+      <!-- Asistencia -->
+      <div class="bnav-item">
+        <div class="bnav-icon-wrap">
+          <svg class="bnav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/>
+          </svg>
+        </div>
+        <span>Asistencia</span>
+      </div>
+
+      <!-- Choferes -->
+      <div class="bnav-item">
+        <div class="bnav-icon-wrap">
+          <svg class="bnav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          </svg>
+        </div>
+        <span>Choferes</span>
+      </div>
+
+      <!-- Perfil -->
+      <div class="bnav-item">
+        <div class="bnav-icon-wrap">
+          <svg class="bnav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <span>Perfil</span>
+      </div>
+
+    </nav>
+  </div>
+</section>
+
+<!-- ── § 6 Typography scale ───────────────────────────────────── -->
+<section>
+  <div class="mockup-label">§ 6 — Typography Scale</div>
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <div style="font-size:48px;font-weight:700;color:var(--purple);letter-spacing:-.03em">145 km</div>
+    <div style="font-size:32px;font-weight:700;color:var(--text);letter-spacing:-.02em">Heading H1 (32px/700)</div>
+    <div style="font-size:20px;font-weight:600;color:var(--text)">Page title (20px/600)</div>
+    <div style="font-size:16px;font-weight:500;color:var(--text)">Section heading (16px/500)</div>
+    <div style="font-size:14px;font-weight:400;color:var(--text2)">Body text (14px/400) — descripción regular de contenido</div>
+    <div style="font-size:12px;font-weight:400;color:var(--text3)">Label / caption (12px/400) — metadata, timestamps, hints</div>
+    <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)">SECTION LABEL (11px/uppercase)</div>
+  </div>
+</section>
+
+</div>
+
+<!-- minimal tap feedback script (demo only) -->
+<script>
+  document.querySelectorAll('.bnav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.bnav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
