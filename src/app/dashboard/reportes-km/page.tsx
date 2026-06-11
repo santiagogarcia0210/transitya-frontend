@@ -49,8 +49,8 @@ function normalizar(e: Record<string,unknown>): ReporteKM {
     combustibleLitros:Number(e.combustibleLitros||e['COMBUSTIBLE LITROS']||e.litros||0),
     combustibleImporte:Number(e.combustibleImporte||e.combustiblePesos||e['COMBUSTIBLE IMPORTE']||e['COMBUSTIBLE PESOS']||e.importe||0),
     observaciones:String(e.observaciones||e.OBSERVACIONES||''),
-    fotoIniUrl:String(e.fotoIniUrl||e.FOTOINICIAL||e.fotoInicio||''),
-    fotoFinUrl:String(e.fotoFinUrl||e.FOTOFINAL||e.fotoFin||''),
+    fotoIniUrl:String(e.fotoIniUrl||e['FOTO KM INICIO']||e.FOTOINICIAL||e.fotoInicio||''),
+    fotoFinUrl:String(e.fotoFinUrl||e['FOTO KM FIN']||e.FOTOFINAL||e.fotoFin||''),
   };
 }
 
