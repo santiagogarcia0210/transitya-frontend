@@ -384,8 +384,15 @@ export default function DashboardPage() {
     fetchTablero();
     fetchUbicaciones();
     fetchAsistHoy();
-    const interval = setInterval(fetchUbicaciones, 30000);
-    return () => clearInterval(interval);
+    const intervalUbic    = setInterval(fetchUbicaciones, 30_000);
+    const intervalTablero = setInterval(() => { fetchTablero(); fetchAsistHoy(); }, 120_000);
+    const onVisible = () => { if (!document.hidden) { fetchTablero(); fetchAsistHoy(); } };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(intervalUbic);
+      clearInterval(intervalTablero);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [perfilLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ─── Estados de carga ─────────────────────────────────────────── */

@@ -14,6 +14,7 @@ interface ReporteKM {
   id:string; fecha:string; chofer:string; vehiculo:string;
   kmInicial:number; kmFinal:number; kmRecorridos:number;
   combustibleLitros:number; combustibleImporte:number; observaciones:string;
+  fotoIniUrl:string; fotoFinUrl:string;
 }
 
 interface FormState {
@@ -29,6 +30,14 @@ interface GrupoChofer {
   registros:ReporteKM[];
 }
 
+const toBase64Raw = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
 function normalizar(e: Record<string,unknown>): ReporteKM {
   const ki=Number(e.kmInicial||e['KM INICIAL']||e.km_inicial||0);
   const kf=Number(e.kmFinal||e['KM FINAL']||e.km_final||0);
@@ -40,6 +49,8 @@ function normalizar(e: Record<string,unknown>): ReporteKM {
     combustibleLitros:Number(e.combustibleLitros||e['COMBUSTIBLE LITROS']||e.litros||0),
     combustibleImporte:Number(e.combustibleImporte||e.combustiblePesos||e['COMBUSTIBLE IMPORTE']||e['COMBUSTIBLE PESOS']||e.importe||0),
     observaciones:String(e.observaciones||e.OBSERVACIONES||''),
+    fotoIniUrl:String(e.fotoIniUrl||e.FOTOINICIAL||e.fotoInicio||''),
+    fotoFinUrl:String(e.fotoFinUrl||e.FOTOFINAL||e.fotoFin||''),
   };
 }
 
@@ -125,22 +136,21 @@ export default function ReportesKMPage() {
   const kmCalc=Math.max(0,(parseFloat(form.kmFinal)||0)-(parseFloat(form.kmInicial)||0));
   const setF=(k:keyof FormState)=>(ev:React.ChangeEvent<HTMLInputElement>)=>setForm(f=>({...f,[k]:ev.target.value}));
   const abrirNuevo=()=>{setForm({...EMPTY,fecha:new Date().toISOString().split('T')[0]});setFotoIniFile(null);setFotoFinFile(null);setPrevIni('');setPrevFin('');setMsg(null);setShowModal(true);};
-  const abrirEdit=(r:ReporteKM)=>{setForm({id:r.id,fecha:r.fecha,chofer:r.chofer,vehiculo:r.vehiculo,kmInicial:String(r.kmInicial),kmFinal:String(r.kmFinal),combustibleLitros:String(r.combustibleLitros),combustibleImporte:String(r.combustibleImporte),observaciones:r.observaciones});setFotoIniFile(null);setFotoFinFile(null);setPrevIni('');setPrevFin('');setMsg(null);setShowModal(true);};
+  const abrirEdit=(r:ReporteKM)=>{setForm({id:r.id,fecha:r.fecha,chofer:r.chofer,vehiculo:r.vehiculo,kmInicial:String(r.kmInicial),kmFinal:String(r.kmFinal),combustibleLitros:String(r.combustibleLitros),combustibleImporte:String(r.combustibleImporte),observaciones:r.observaciones});setFotoIniFile(null);setFotoFinFile(null);setPrevIni(r.fotoIniUrl||'');setPrevFin(r.fotoFinUrl||'');setMsg(null);setShowModal(true);};
   const cerrar=()=>{setShowModal(false);setMsg(null);};
 
   const guardar=async()=>{
     if(!form.fecha||!form.chofer){setMsg({text:'Completá fecha y chofer',ok:false});return;}
     setSaving(true);setMsg(null);
     try{
-      let payload: FormData | Record<string,string>;
-      if(fotoIniFile||fotoFinFile){
-        const fd=new FormData();
-        (Object.entries({...form,kmRecorridos:String(kmCalc)}) as [string,string][]).forEach(([k,v])=>fd.append(k,v));
-        if(fotoIniFile) fd.append('fotoInicio',fotoIniFile);
-        if(fotoFinFile) fd.append('fotoFin',fotoFinFile);
-        payload=fd;
-      } else {
-        payload={...form,kmRecorridos:String(kmCalc)};
+      const payload: Record<string,unknown> = {...form, kmRecorridos:String(kmCalc)};
+      if(fotoIniFile){
+        payload.fotoIniBase64 = await toBase64Raw(fotoIniFile);
+        payload.mimeTypeFotos = fotoIniFile.type || 'image/jpeg';
+      }
+      if(fotoFinFile){
+        payload.fotoFinBase64 = await toBase64Raw(fotoFinFile);
+        payload.mimeTypeFotos = fotoFinFile.type || 'image/jpeg';
       }
       form.id?await api.put(`/api/reportes/${form.id}`,payload):await api.post('/api/reportes',payload);
       cerrar();cargar();
@@ -309,6 +319,18 @@ export default function ReportesKMPage() {
                           <p style={{fontSize:'.78rem',color:'var(--text3)',marginTop:'.15rem'}}>
                             {r.fecha}{r.combustibleLitros>0&&` · ${r.combustibleLitros} L`}{r.combustibleImporte>0&&` · $${r.combustibleImporte.toLocaleString('es-AR')}`}
                           </p>
+                          {(r.fotoIniUrl||r.fotoFinUrl)&&(
+                            <div style={{display:'flex',gap:4,marginTop:4}}>
+                              {r.fotoIniUrl&&<img src={r.fotoIniUrl} alt="KM inicial" title="Foto KM inicial"
+                                style={{width:36,height:36,objectFit:'cover',borderRadius:4,border:'1px solid var(--border)',flexShrink:0}}
+                                onClick={ev=>{ev.stopPropagation();window.open(r.fotoIniUrl,'_blank');}}
+                                onError={ev=>(ev.currentTarget.style.display='none')}/>}
+                              {r.fotoFinUrl&&<img src={r.fotoFinUrl} alt="KM final" title="Foto KM final"
+                                style={{width:36,height:36,objectFit:'cover',borderRadius:4,border:'1px solid var(--border)',flexShrink:0}}
+                                onClick={ev=>{ev.stopPropagation();window.open(r.fotoFinUrl,'_blank');}}
+                                onError={ev=>(ev.currentTarget.style.display='none')}/>}
+                            </div>
+                          )}
                         </div>
                         <p style={{fontSize:'1rem',fontWeight:700,color:'var(--purple)',whiteSpace:'nowrap'}}>{r.kmRecorridos.toLocaleString('es-AR')} km</p>
                         {confirmDel===r.id?(
