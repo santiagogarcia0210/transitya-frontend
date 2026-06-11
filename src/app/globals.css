@@ -6,21 +6,21 @@
 
 :root {
   /* ── Backgrounds ─────────────────────────────────────────── */
-  --bg:      #0a0f1e;   /* navy profundo */
-  --bg2:     #0c1220;   /* sidebar */
-  --bg3:     #0d1526;   /* cards */
-  --bg4:     #1a2236;   /* inputs / hover */
-  --bg5:     #1e2d44;   /* resaltado sutil */
+  --bg:      #0F1729;   /* base casi-negro púrpura */
+  --bg2:     #141B33;   /* sidebar */
+  --bg3:     #1A2142;   /* content bg */
+  --bg4:     #232B4E;   /* inputs / cards */
+  --bg5:     #2D3456;   /* hover / resaltado */
 
   /* ── Borders ──────────────────────────────────────────────── */
-  --border:      #1f2d40;
-  --border2:     #2d3f55;
-  --border-hover:#3b5068;
+  --border:      #1e2545;
+  --border2:     #2d3a6e;
+  --border-hover:#4a4daa;
 
   /* ── Text ─────────────────────────────────────────────────── */
-  --text:  #e8eaf6;
-  --text2: #c8d6e5;
-  --text3: #8892a4;
+  --text:  #FFFFFF;
+  --text2: #B0B8D4;
+  --text3: #6B7699;
 
   /* ── Brand & semánticos ───────────────────────────────────── */
   --blue:        #3b82f6;
@@ -37,8 +37,14 @@
   --amber:     #f59e0b;
   --amber-dim: rgba(245,158,11,.13);
 
-  --purple:     #8b5cf6;
-  --purple-dim: rgba(139,92,246,.13);
+  --purple:        #6C5FFF;
+  --purple-dark:   #4B47DB;
+  --purple-bright: #9d94ff;
+  --purple-dim:    rgba(108,95,255,.15);
+  --purple-glow:   rgba(108,95,255,.30);
+
+  --cyan:     #00D9FF;
+  --cyan-dim: rgba(0,217,255,.12);
 
   --teal:     #14b8a6;
   --teal-dim: rgba(20,184,166,.13);
@@ -52,7 +58,7 @@
   --kpi-naranja:  #ffa726;
 
   /* ── Radios / Transición ──────────────────────────────────── */
-  --radius:    8px;
+  --radius:    10px;
   --radius-lg: 14px;
   --radius-xl: 20px;
   --transition: 160ms ease;
@@ -120,8 +126,8 @@ html, body {
   white-space: nowrap;
   min-height: 38px;
 }
-.btn-primary   { background: var(--blue); color: #fff; }
-.btn-primary:hover { background: var(--blue-hover); box-shadow: 0 0 16px rgba(59,130,246,.35); }
+.btn-primary   { background: var(--purple); color: #fff; }
+.btn-primary:hover { background: var(--purple-dark); box-shadow: 0 0 16px var(--purple-glow); }
 .btn-secondary { background: var(--bg4); color: var(--text2); border: 1px solid var(--border2); }
 .btn-secondary:hover { background: var(--bg5); color: var(--text); border-color: var(--border-hover); }
 .btn-danger    { background: var(--red-dim); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
@@ -148,8 +154,8 @@ html, body {
 }
 .textarea { min-height: 80px; resize: vertical; }
 .input:focus, .select:focus, .textarea:focus {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px var(--blue-dim);
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px var(--purple-dim);
 }
 .input::placeholder, .textarea::placeholder { color: var(--text3); }
 .select option { background: var(--bg4); color: var(--text); }
@@ -196,7 +202,7 @@ html, body {
   color: var(--text2); font-size: .925rem;
 }
 .tabla tr:last-child td { border-bottom: none; }
-.tabla tr:hover td { background: rgba(59,130,246,.04); }
+.tabla tr:hover td { background: rgba(108,95,255,.06); }
 
 /* ═══════════════════════════════════════════════════════════════════════
    KPI STAT CARDS — números muy grandes, espíritu GAS
@@ -324,7 +330,7 @@ html, body {
 .spinner {
   width: 20px; height: 20px;
   border: 2.5px solid var(--border2);
-  border-top-color: var(--blue);
+  border-top-color: var(--purple);
   border-radius: 50%;
   animation: spin .65s linear infinite;
   display: inline-block; flex-shrink: 0;
@@ -368,7 +374,7 @@ html, body {
   color: var(--text3); background: none; border: none; cursor: pointer;
   border-bottom: 2px solid transparent; transition: all var(--transition);
 }
-.tab-btn.active { color: var(--blue-bright); border-bottom-color: var(--blue); }
+.tab-btn.active { color: var(--purple-bright); border-bottom-color: var(--purple); }
 .tab-btn:hover:not(.active) { color: var(--text2); }
 
 .pagination { display: flex; gap: .4rem; justify-content: center; margin-top: 1.25rem; }
@@ -376,7 +382,7 @@ html, body {
   padding: .35rem .75rem; border-radius: var(--radius); font-size: .82rem;
   background: var(--bg4); border: 1px solid var(--border2); color: var(--text2); cursor: pointer;
 }
-.pagination button.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.pagination button.active { background: var(--purple); color: #fff; border-color: var(--purple); }
 .pagination button:hover:not(.active) { background: var(--bg5); }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -391,9 +397,9 @@ html, body {
   min-height: 110px; justify-content: center;
 }
 .module-card:hover {
-  border-color: var(--blue-bright);
-  background: rgba(59,130,246,.07);
-  box-shadow: 0 0 0 1px var(--blue-dim), 0 8px 24px rgba(0,0,0,.25);
+  border-color: var(--purple-bright);
+  background: var(--purple-dim);
+  box-shadow: 0 0 0 1px var(--purple-dim), 0 8px 24px rgba(0,0,0,.25);
   transform: translateY(-2px);
 }
 .module-card .mc-icon  { font-size: 2rem; line-height: 1; }
@@ -443,7 +449,7 @@ html, body {
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Focus visible ── */
-:focus-visible { outline: 2px solid var(--blue) !important; outline-offset: 2px !important; }
+:focus-visible { outline: 2px solid var(--purple) !important; outline-offset: 2px !important; }
 
 /* ── Tablero KPI (grid de tarjetas numéricas) ── */
 .tablero { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 12px; margin-bottom: 32px; }
@@ -454,9 +460,9 @@ html, body {
   transition: border-color var(--transition), box-shadow var(--transition);
   min-width: 0;
 }
-.tablero-card:hover { border-color: var(--border-hover); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+.tablero-card:hover { border-color: var(--border-hover); box-shadow: 0 4px 20px rgba(108,95,255,.15); transform: translateY(-2px); }
 .tablero-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
-.tablero-value { font-size: clamp(22px,3.5vw,36px); font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.1; letter-spacing: -.02em; margin: 8px 0 4px; word-break: break-word; }
+.tablero-value { font-size: clamp(28px,4vw,42px); font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -.03em; margin: 8px 0 4px; word-break: break-word; }
 .tablero-sub   { font-size: 11px; color: var(--text3); margin-top: 6px; }
 .tablero-card.blue   .tablero-value { color: var(--blue); }
 .tablero-card.green  .tablero-value { color: var(--green); }

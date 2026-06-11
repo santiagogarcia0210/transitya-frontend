@@ -126,7 +126,7 @@ export default function Sidebar() {
           <span style={{
             display: 'inline-block', marginTop: '.45rem',
             fontSize: '.62rem', fontWeight: 600, letterSpacing: '.05em',
-            color: 'var(--blue-bright)', background: 'var(--blue-dim)',
+            color: 'var(--purple-bright)', background: 'var(--purple-dim)',
             padding: '.15rem .5rem', borderRadius: 99,
             textTransform: 'uppercase',
           }}>
@@ -170,15 +170,15 @@ export default function Sidebar() {
                     padding: '9px 16px 9px 13px',
                     fontSize: '.88rem',
                     fontWeight: active ? 600 : 500,
-                    color: active ? 'var(--blue-bright)' : 'var(--text3)',
-                    background: active ? 'rgba(59,130,246,.08)' : 'transparent',
-                    borderLeft: active ? '3px solid var(--blue)' : '3px solid transparent',
+                    color: active ? 'var(--purple-bright)' : 'var(--text3)',
+                    background: active ? 'var(--purple-dim)' : 'transparent',
+                    borderLeft: active ? '3px solid var(--purple)' : '3px solid transparent',
                   }}
                   onMouseEnter={e => {
                     if (!active) {
                       const el = e.currentTarget as HTMLAnchorElement;
                       el.style.color = 'var(--text)';
-                      el.style.background = 'rgba(255,255,255,.04)';
+                      el.style.background = 'rgba(108,95,255,.07)';
                     }
                   }}
                   onMouseLeave={e => {
