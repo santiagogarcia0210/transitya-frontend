@@ -20,14 +20,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [router]);
 
   return (
-    <div className="dashboard-layout" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)', position: 'relative', overflow: 'hidden' }}>
+    <div className="dashboard-layout" style={{ minHeight: '100vh', background: 'var(--bg)', position: 'relative' }}>
       <FlowFieldBackground intensity="subtle" />
-      <div style={{ display: 'flex', flex: 1, position: 'relative', zIndex: 1, minWidth: 0 }}>
-        <Sidebar />
-        <main className="dashboard-main" style={{ flex: 1, padding: '1.75rem 2rem', overflowY: 'auto', minWidth: 0 }}>
-          {children}
-        </main>
-      </div>
+      <Sidebar />
+      <main className="dashboard-main" style={{ position: 'relative', zIndex: 1, padding: '1.75rem 2rem', overflowY: 'auto', minHeight: '100vh' }}>
+        {children}
+      </main>
       <BottomNav />
     </div>
   );
