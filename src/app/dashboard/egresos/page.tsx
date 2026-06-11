@@ -147,9 +147,10 @@ export default function EgresosPage() {
     if (!archivo) { fileRef.current?.click(); return; }
     setScanning(true);
     try {
-      const fd = new FormData();
-      fd.append('comprobante', archivo);
-      const r = await api.post('/api/egresos/escanear', fd);
+      const dataUrl  = await toBase64(archivo);
+      const [prefix, b64] = dataUrl.split(',');
+      const mimeType = prefix.replace('data:', '').replace(';base64', '');
+      const r = await api.post('/api/egresos/escanear', { fotoBase64: b64, mimeType });
       const d = r.data;
       setForm(f => ({
         ...f,
