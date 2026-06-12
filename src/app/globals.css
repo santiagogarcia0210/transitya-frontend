@@ -622,6 +622,16 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
   .egresos-table { display: block; overflow-x: auto; white-space: nowrap; }
   .btn-row { flex-direction: column; }
   .btn-row .btn { width: 100%; }
+  .saldo-grid { grid-template-columns: 1fr !important; }
+}
+
+/* Saldo + movimientos responsive 2-col */
+.saldo-grid {
+  display: grid;
+  grid-template-columns: minmax(200px,1fr) minmax(280px,2fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  align-items: start;
 }
 
 /* ── Logo border beam ── */
@@ -856,8 +866,8 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
   /* Hide sidebar on mobile */
   .dashboard-sidebar { display: none !important; }
 
-  /* Add bottom padding so content isn't hidden behind nav */
-  .dashboard-main { padding-bottom: 100px !important; }
+  /* Add bottom padding so content isn't hidden behind nav; reduce horizontal padding */
+  .dashboard-main { padding-bottom: 100px !important; padding-left: 1rem !important; padding-right: 1rem !important; }
 
   /* Show bottom nav */
   .bnav {

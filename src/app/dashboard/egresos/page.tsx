@@ -404,9 +404,9 @@ export default function EgresosPage() {
                   {filtrados.map(e => (
                     <div key={e.id} className="result-item">
                       <div className="result-body" style={{ flex:1 }}>
-                        <div className="result-name" style={{ display:'flex', justifyContent:'space-between' }}>
-                          <span>{e.concepto || e.proveedor || 'Egreso'}</span>
-                          <span style={{ fontWeight:700, color:'var(--red)', fontSize:'.95rem' }}>{fmt(e.monto)}</span>
+                        <div className="result-name" style={{ display:'flex', justifyContent:'space-between', gap:'.5rem' }}>
+                          <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.concepto || e.proveedor || 'Egreso'}</span>
+                          <span style={{ fontWeight:700, color:'var(--red)', fontSize:'.95rem', flexShrink:0 }}>{fmt(e.monto)}</span>
                         </div>
                         <div className="result-meta">
                           {e.fecha      && <span>{e.fecha}</span>}

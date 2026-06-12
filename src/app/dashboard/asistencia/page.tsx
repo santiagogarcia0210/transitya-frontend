@@ -665,9 +665,9 @@ export default function AsistenciaPage() {
                         fontSize:'.7rem', color:'#fff', transition:'all .15s' }}>
                         {p ? '✓' : ''}
                       </span>
-                      <span style={{ flex:1, fontSize:'.88rem', fontWeight:p?600:400, color:'var(--text)' }}>{b.nombre}</span>
-                      {b.chofer && <span style={{ fontSize:'.72rem', color:'var(--text3)' }}>{b.chofer}</span>}
-                      <span className={`badge ${p ? 'badge-green' : 'badge-gray'}`} style={{ fontSize:'.7rem' }}>
+                      <span style={{ flex:1, minWidth:0, fontSize:'.88rem', fontWeight:p?600:400, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.nombre}</span>
+                      {b.chofer && <span style={{ fontSize:'.72rem', color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'6rem', flexShrink:1 }}>{b.chofer}</span>}
+                      <span className={`badge ${p ? 'badge-green' : 'badge-gray'}`} style={{ fontSize:'.7rem', flexShrink:0 }}>
                         {p ? 'PRESENTE' : 'AUSENTE'}
                       </span>
                     </div>

@@ -150,8 +150,8 @@ function ChoferDashboard({ perfil }: { perfil: PerfilChofer }) {
           display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
           🚗
         </div>
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:'1rem', fontWeight:700, color:'var(--text)' }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:'1rem', fontWeight:700, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
             Hola, {perfil.nombre || perfil.email}
           </div>
           <div style={{ fontSize:11, color:'var(--text3)', marginTop:2 }}>{fechaTxt}</div>
@@ -461,8 +461,8 @@ export default function DashboardPage() {
               {(tab.empresaNombre || 'T').split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() || '🚐'}
             </div>
           )}
-          <div>
-            <div style={{ fontSize:'1.15rem', fontWeight:800, color:'var(--text)', letterSpacing:'-.01em' }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:'1.15rem', fontWeight:800, color:'var(--text)', letterSpacing:'-.01em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
               {tab.empresaNombre || 'TRANSPORTE FLORES'}
             </div>
             <div style={{ fontSize:'.82rem', color:'var(--text3)', marginTop:'2px' }}>
@@ -488,10 +488,10 @@ export default function DashboardPage() {
                   background: ch.tieneReporte ? 'rgba(63,185,80,0.12)' : 'rgba(248,81,73,0.12)',
                   border: `1px solid ${ch.tieneReporte ? 'rgba(63,185,80,0.3)' : 'rgba(248,81,73,0.3)'}`,
                 }}>
-                  <span style={{ fontSize:'14px' }}>{ch.tieneReporte ? '✅' : '❌'}</span>
-                  <div>
-                    <div style={{ fontSize:'11px', fontWeight:600, color:'var(--text)' }}>{ch.nombre||ch.usuario}</div>
-                    {ch.vehiculo && <div style={{ fontSize:'10px', color:'var(--text3)' }}>{ch.vehiculo}</div>}
+                  <span style={{ fontSize:'14px', flexShrink:0 }}>{ch.tieneReporte ? '✅' : '❌'}</span>
+                  <div style={{ minWidth:0, overflow:'hidden' }}>
+                    <div style={{ fontSize:'11px', fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'120px' }}>{ch.nombre||ch.usuario}</div>
+                    {ch.vehiculo && <div style={{ fontSize:'10px', color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'120px' }}>{ch.vehiculo}</div>}
                   </div>
                 </div>
               ))}
@@ -518,7 +518,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Saldo + Movimientos */}
-      <div style={{ display:'grid', gridTemplateColumns:'minmax(200px,1fr) minmax(280px,2fr)', gap:'1rem', marginBottom:'1.5rem', alignItems:'start' }}>
+      <div className="saldo-grid">
         {/* Saldo */}
         <div className="card" style={{ borderLeft:`4px solid ${saldo>=0?'var(--green)':'var(--red)'}` }}>
           <p style={{ fontSize:'.78rem', color:'var(--text3)', marginBottom:'.35rem' }}>Saldo del mes · cobrado − egresos</p>

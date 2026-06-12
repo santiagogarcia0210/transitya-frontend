@@ -310,9 +310,9 @@ export default function IngresosPage() {
                   {filtrados.map(e => (
                     <div key={e.id} className="result-item">
                       <div className="result-body" style={{ flex:1 }}>
-                        <div className="result-name" style={{ display:'flex', justifyContent:'space-between' }}>
-                          <span>{e.concepto}</span>
-                          <span style={{ fontWeight:700, color:'var(--green)' }}>{fmt(e.monto)}</span>
+                        <div className="result-name" style={{ display:'flex', justifyContent:'space-between', gap:'.5rem' }}>
+                          <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.concepto}</span>
+                          <span style={{ fontWeight:700, color:'var(--green)', flexShrink:0 }}>{fmt(e.monto)}</span>
                         </div>
                         <div className="result-meta">
                           {e.fecha       && <span>{formatFecha(e.fecha)}</span>}

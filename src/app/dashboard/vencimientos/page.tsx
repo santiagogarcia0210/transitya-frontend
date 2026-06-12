@@ -187,7 +187,7 @@ export default function VencimientosPage() {
             {lista.filter(v => v.estado === 'PROXIMO').map(v => (
               <div key={v.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
                 fontSize:'.82rem', color:'var(--text)' }}>
-                <span>{v.descripcion}{(v.persona||v.chofer) && ` — ${v.persona||v.chofer}`}</span>
+                <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{v.descripcion}{(v.persona||v.chofer) && ` — ${v.persona||v.chofer}`}</span>
                 <span style={{ fontWeight:700, color:'var(--amber)', flexShrink:0, marginLeft:'1rem' }}>
                   {v.diasRestantes} día{v.diasRestantes !== 1 ? 's' : ''}
                 </span>
