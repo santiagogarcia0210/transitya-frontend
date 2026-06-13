@@ -149,12 +149,13 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <div className="logo-beam" style={{ display: 'inline-flex', borderRadius: '10px' }}>
+          <div className="login-logo-wrap">
+            <div className="login-logo-ring" aria-hidden="true" />
             <Image
-              src="/assets/logo-horizontal.png"
+              src="/assets/logo-circular.png"
               alt="Transit·Ya"
-              width={200} height={60}
-              style={{ objectFit: 'contain', display: 'block' }}
+              width={96} height={96}
+              className="login-logo-img"
               priority
             />
           </div>
