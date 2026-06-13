@@ -45,9 +45,9 @@ export default function EmpresasPage() {
   const [detalle,  setDetalle]  = useState<EmpresaDetalle | null>(null);
   const [detalleId, setDetalleId] = useState('');
   const [loadingDetalle, setLoadingDetalle] = useState(false);
-  const [accionId, setAccionId] = useState('');
   const [accionMsg, setAccionMsg] = useState('');
-  const [motivoSusp, setMotivoSusp] = useState('');
+  const [toggling, setToggling] = useState<Set<string>>(new Set());
+  const [confirmToggle, setConfirmToggle] = useState<{ empresa: Empresa; motivo: string } | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -78,14 +78,29 @@ export default function EmpresasPage() {
     setLoadingDetalle(false);
   };
 
-  const toggleEstado = async (e: Empresa, motivo?: string) => {
-    const nuevoActivo = e.suspendida || !e.activo;
+  const toggleEstado = async (empresa: Empresa, motivo?: string) => {
+    const nuevoActivo = empresa.suspendida || !empresa.activo;
+    setConfirmToggle(null);
+    setToggling(prev => new Set(prev).add(empresa.tenantId));
+    // Optimistic update
+    setLista(prev => prev.map(e =>
+      e.tenantId === empresa.tenantId
+        ? { ...e, activo: nuevoActivo, suspendida: !nuevoActivo }
+        : e
+    ));
     try {
-      await api.put(`/api/superadmin/empresas/${e.tenantId}/estado`, { activo: nuevoActivo, motivo: motivo || '' });
+      await api.put(`/api/superadmin/empresas/${empresa.tenantId}/estado`, { activo: nuevoActivo, motivo: motivo || '' });
       setAccionMsg(`✅ Empresa ${nuevoActivo ? 'reactivada' : 'suspendida'}.`);
-      cargar();
-    } catch { setAccionMsg('Error al cambiar estado.'); }
-    setAccionId('');
+    } catch {
+      // Rollback on error
+      setLista(prev => prev.map(e =>
+        e.tenantId === empresa.tenantId
+          ? { ...e, activo: empresa.activo, suspendida: empresa.suspendida }
+          : e
+      ));
+      setAccionMsg('❌ Error al cambiar estado. No se guardó el cambio.');
+    }
+    setToggling(prev => { const s = new Set(prev); s.delete(empresa.tenantId); return s; });
   };
 
   const planes = [...new Set(lista.map(e => e.plan).filter(Boolean))].sort();
@@ -167,25 +182,34 @@ export default function EmpresasPage() {
                     <td style={{ padding:'8px 10px' }}><DiasBadge fecha={e.fechaProximoCobro} /></td>
                     <td style={{ padding:'8px 10px', color:'var(--text2)' }}>{e.choferesActivos}/{e.maxChoferes}</td>
                     <td style={{ padding:'8px 10px' }}>
-                      <div style={{ display:'flex', gap:'.35rem' }}>
+                      <div style={{ display:'flex', gap:'.5rem', alignItems:'center' }}>
                         <button className="btn btn-secondary btn-sm" onClick={() => verDetalle(e.tenantId)}>Ver</button>
-                        {accionId === e.tenantId ? (
-                          <div style={{ display:'flex', gap:'.25rem', alignItems:'center' }}>
-                            {isSusp ? (
-                              <button className="btn btn-primary btn-sm" onClick={() => toggleEstado(e)}>✅ Activar</button>
-                            ) : (
-                              <>
-                                <input className="input" placeholder="Motivo…" style={{ fontSize:'.72rem', padding:'.25rem .5rem', width:100 }}
-                                  value={motivoSusp} onChange={ev => setMotivoSusp(ev.target.value)} />
-                                <button className="btn btn-danger btn-sm" onClick={() => toggleEstado(e, motivoSusp)}>⛔</button>
-                              </>
-                            )}
-                            <button className="btn btn-secondary btn-sm" onClick={() => setAccionId('')}>✕</button>
-                          </div>
+                        {toggling.has(e.tenantId) ? (
+                          <span className="spinner" style={{ width:14, height:14, flexShrink:0 }} />
                         ) : (
-                          <button className={`btn btn-sm ${isSusp ? 'btn-primary' : 'btn-danger'}`}
-                            onClick={() => { setAccionId(e.tenantId); setMotivoSusp(''); setAccionMsg(''); }}>
-                            {isSusp ? 'Activar' : 'Suspender'}
+                          <button
+                            role="switch"
+                            aria-checked={!isSusp}
+                            title={isSusp ? 'Reactivar empresa' : 'Suspender empresa'}
+                            onClick={() => {
+                              setAccionMsg('');
+                              if (isSusp) toggleEstado(e);
+                              else setConfirmToggle({ empresa: e, motivo: '' });
+                            }}
+                            style={{
+                              width:36, height:20, borderRadius:10, border:'none', cursor:'pointer',
+                              background: isSusp ? '#4B5563' : '#6C5FFF',
+                              position:'relative', flexShrink:0, padding:0,
+                              transition:'background .2s',
+                            }}
+                          >
+                            <span style={{
+                              position:'absolute', top:2,
+                              left: isSusp ? 2 : 18,
+                              width:16, height:16, borderRadius:'50%',
+                              background:'#fff', display:'block',
+                              transition:'left .2s',
+                            }} />
                           </button>
                         )}
                       </div>
@@ -195,6 +219,38 @@ export default function EmpresasPage() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Modal confirmación suspensión */}
+      {confirmToggle && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.65)', display:'flex',
+          alignItems:'center', justifyContent:'center', zIndex:60, padding:'1rem' }}
+          onClick={ev => { if (ev.target === ev.currentTarget) setConfirmToggle(null); }}>
+          <div className="card" style={{ width:'100%', maxWidth:420, padding:'1.5rem' }}>
+            <h3 style={{ fontSize:'1rem', fontWeight:700, color:'var(--text)', marginBottom:'.75rem' }}>
+              Suspender empresa
+            </h3>
+            <p style={{ fontSize:'.85rem', color:'var(--text2)', marginBottom:'1rem' }}>
+              Esto cortará el acceso de <strong style={{ color:'var(--text)' }}>{confirmToggle.empresa.nombre}</strong> a la plataforma. Podés reactivarla en cualquier momento.
+            </p>
+            <label style={{ display:'block', fontSize:'.75rem', color:'var(--text3)', marginBottom:'.3rem', fontWeight:500 }}>
+              Motivo (opcional)
+            </label>
+            <input className="input" placeholder="Ej: falta de pago"
+              value={confirmToggle.motivo}
+              onChange={ev => setConfirmToggle(prev => prev ? { ...prev, motivo: ev.target.value } : null)}
+              style={{ marginBottom:'1rem' }} />
+            <div style={{ display:'flex', gap:'.75rem' }}>
+              <button className="btn btn-secondary" style={{ flex:1 }} onClick={() => setConfirmToggle(null)}>
+                Cancelar
+              </button>
+              <button className="btn btn-danger" style={{ flex:1 }}
+                onClick={() => toggleEstado(confirmToggle.empresa, confirmToggle.motivo)}>
+                Suspender
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
