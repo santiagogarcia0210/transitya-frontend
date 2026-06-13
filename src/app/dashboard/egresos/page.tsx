@@ -6,7 +6,8 @@ import Button from '@/components/ui/Button';
 
 type TabEgr = 'carga' | 'buscar' | 'stats';
 
-const CATEGORIAS = ['Combustible', 'Repuesto', 'Mantenimiento', 'Seguro', 'Peaje', 'Limpieza', 'Otro'];
+const CATEGORIAS   = ['Combustible', 'Repuesto', 'Mantenimiento', 'Seguro', 'Peaje', 'Limpieza', 'Otro'];
+const MIMES_VALIDOS = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 interface Egreso {
@@ -69,8 +70,10 @@ export default function EgresosPage() {
   const [archivo,        setArchivo]        = useState<File | null>(null);
   const [previewUrl,     setPreviewUrl]     = useState('');
   const [saving,         setSaving]         = useState(false);
-  const [scanning,       setScanning]       = useState(false);
-  const [dupWarning,     setDupWarning]     = useState(false);
+  const [scanning,        setScanning]        = useState(false);
+  const [scanWarnings,    setScanWarnings]    = useState<string[]>([]);
+  const [requiereRevision, setRequiereRevision] = useState(false);
+  const [dupWarning,      setDupWarning]      = useState(false);
   const [msgCarga,       setMsgCarga]       = useState<{ text: string; ok: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -145,23 +148,30 @@ export default function EgresosPage() {
 
   const escanear = async () => {
     if (!archivo) { fileRef.current?.click(); return; }
-    setScanning(true);
+    const mimeType = archivo.type || 'image/jpeg';
+    if (!MIMES_VALIDOS.includes(mimeType)) {
+      setMsgCarga({ text: `Formato no soportado (${mimeType}). Usá JPG o PNG.`, ok: false });
+      return;
+    }
+    setScanning(true); setScanWarnings([]); setRequiereRevision(false); setMsgCarga(null);
     try {
-      const dataUrl  = await toBase64(archivo);
-      const [prefix, b64] = dataUrl.split(',');
-      const mimeType = prefix.replace('data:', '').replace(';base64', '');
+      const dataUrl = await toBase64(archivo);
+      const b64 = dataUrl.split(',')[1];
       const r = await api.post('/api/egresos/escanear', { fotoBase64: b64, mimeType });
-      const d = r.data;
+      const { datos = {}, advertencias = [], requiere_revision = false } = r.data;
+      setScanWarnings(advertencias);
+      setRequiereRevision(requiere_revision);
       setForm(f => ({
         ...f,
-        fecha:     d.fecha     || d.FECHA     || f.fecha,
-        concepto:  d.concepto  || d.CONCEPTO  || f.concepto,
-        monto:     String(d.monto || d.MONTO  || f.monto),
-        categoria: d.categoria || d.CATEGORIA || f.categoria,
-        proveedor: d.proveedor || d.PROVEEDOR || f.proveedor,
+        fecha:     fechaISO(datos.fecha || '') || f.fecha,
+        concepto:  datos.concepto  || f.concepto,
+        monto:     datos.monto != null ? String(datos.monto) : f.monto,
+        categoria: datos.categoria || f.categoria,
+        proveedor: datos.proveedor || f.proveedor,
       }));
-    } catch {
-      setMsgCarga({ text: 'No se pudo escanear el comprobante', ok: false });
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { mensaje?: string } } })?.response?.data?.mensaje;
+      setMsgCarga({ text: msg || 'No se pudo escanear el comprobante', ok: false });
     }
     setScanning(false);
   };
@@ -307,6 +317,16 @@ export default function EgresosPage() {
             </div>
           </div>
 
+          {requiereRevision && scanWarnings.length > 0 && (
+            <div style={{ background:'rgba(245,158,11,.1)', border:'1px solid var(--amber)',
+              borderRadius:'var(--radius)', padding:'.75rem 1rem', marginTop:'1rem', fontSize:'.82rem', color:'var(--amber)' }}>
+              ⚠️ La IA completó el escaneo pero encontró datos dudosos. Verificá antes de guardar:
+              <ul style={{ margin:'.35rem 0 0 1.1rem', padding:0 }}>
+                {scanWarnings.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+            </div>
+          )}
+
           {dupWarning && (
             <div style={{ background:'var(--amber-dim)', border:'1px solid var(--amber)',
               borderRadius:'var(--radius)', padding:'.75rem 1rem', marginTop:'1rem',
@@ -332,7 +352,7 @@ export default function EgresosPage() {
               {!saving && '✓ Guardar egreso'}
               {saving && 'Guardando…'}
             </Button>
-            <Button variant="secondary" onClick={() => { setForm(EMPTY); setArchivo(null); setPreviewUrl(''); setMsgCarga(null); }}>
+            <Button variant="secondary" onClick={() => { setForm(EMPTY); setArchivo(null); setPreviewUrl(''); setMsgCarga(null); setScanWarnings([]); setRequiereRevision(false); }}>
               Limpiar
             </Button>
           </div>
