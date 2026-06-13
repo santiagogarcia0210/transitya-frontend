@@ -4,7 +4,16 @@ import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 
-const TIPOS_COMB =['Nafta Super', 'Nafta Premium', 'Diesel', 'Gasoil', 'GNC', 'Otro'];
+const TIPOS_COMB    = ['Nafta Super', 'Nafta Premium', 'Diesel', 'Gasoil', 'GNC', 'Otro'];
+const MIMES_VALIDOS = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+const toBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 interface Remito {
   id: string; fecha: string; nroRemito: string; razonSocial: string;
@@ -78,8 +87,10 @@ export default function RemitosPage() {
   const [archivo,       setArchivo]       = useState<File | null>(null);
   const [previewUrl,    setPreviewUrl]    = useState('');
   const [saving,        setSaving]        = useState(false);
-  const [scanning,      setScanning]      = useState(false);
-  const [dupWarning,    setDupWarning]    = useState(false);
+  const [scanning,         setScanning]         = useState(false);
+  const [scanWarnings,     setScanWarnings]     = useState<string[]>([]);
+  const [requiereRevision, setRequiereRevision] = useState(false);
+  const [dupWarning,       setDupWarning]       = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [msg,           setMsg]           = useState<{ text: string; ok: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -122,6 +133,7 @@ export default function RemitosPage() {
 
   const abrirNuevo = () => {
     setForm(EMPTY); setArchivo(null); setPreviewUrl('');
+    setScanWarnings([]); setRequiereRevision(false);
     setDupWarning(false); setMsg(null); setShowModal(true);
   };
 
@@ -136,7 +148,10 @@ export default function RemitosPage() {
     setDupWarning(false); setMsg(null); setShowModal(true);
   };
 
-  const cerrarModal = () => { setShowModal(false); setMsg(null); setDupWarning(false); };
+  const cerrarModal = () => {
+    setShowModal(false); setMsg(null); setDupWarning(false);
+    setScanWarnings([]); setRequiereRevision(false);
+  };
 
   const onArchivo = (ev: React.ChangeEvent<HTMLInputElement>) => {
     const f = ev.target.files?.[0] || null;
@@ -146,26 +161,35 @@ export default function RemitosPage() {
 
   const escanear = async () => {
     if (!archivo) { fileRef.current?.click(); return; }
-    setScanning(true); setMsg(null);
+    const mimeType = archivo.type || 'image/jpeg';
+    if (!MIMES_VALIDOS.includes(mimeType)) {
+      setMsg({ text: `Formato no soportado (${mimeType}). Usá JPG o PNG.`, ok: false });
+      return;
+    }
+    setScanning(true); setScanWarnings([]); setRequiereRevision(false); setMsg(null);
     try {
-      const fd = new FormData();
-      fd.append('comprobante', archivo);
-      const r = await api.post('/api/remitos/escanear', fd);
-      const d = r.data;
-      if (d.error) { setMsg({ text: d.error, ok: false }); setScanning(false); return; }
+      const dataUrl = await toBase64(archivo);
+      const b64 = dataUrl.split(',')[1];
+      const r = await api.post('/api/remitos/escanear', { fotoBase64: b64, mimeType });
+      const { datos = {}, advertencias = [], requiere_revision = false } = r.data;
+      setScanWarnings(advertencias);
+      setRequiereRevision(requiere_revision);
       setForm(f => ({
         ...f,
-        nroRemito:      d.nroRemito      ?? f.nroRemito,
-        razonSocial:    d.razonSocial    ?? f.razonSocial,
-        cuit:           d.cuit           ?? f.cuit,
-        fecha:          d.fecha          ?? f.fecha,
-        combustible:    d.combustible    != null ? String(d.combustible)    : f.combustible,
-        tipoCombustible:d.tipoCombustible ?? f.tipoCombustible,
-        monto:          d.monto          != null ? String(d.monto)          : f.monto,
+        nroRemito:       datos.nroRemito      != null ? String(datos.nroRemito)          : f.nroRemito,
+        razonSocial:     datos.razonSocial     != null ? String(datos.razonSocial)        : f.razonSocial,
+        cuit:            datos.cuit            != null ? String(datos.cuit)               : f.cuit,
+        fecha:           fechaISO(datos.fecha  || '') || f.fecha,
+        combustible:     datos.combustible     != null ? String(datos.combustible)        : f.combustible,
+        tipoCombustible: datos.tipoCombustible != null ? String(datos.tipoCombustible)    : f.tipoCombustible,
+        monto:           datos.monto           != null ? String(datos.monto)              : f.monto,
       }));
-      setMsg({ text: '✓ Datos extraídos del comprobante', ok: true });
-    } catch {
-      setMsg({ text: 'No se pudo escanear el comprobante', ok: false });
+      if (!requiere_revision && advertencias.length === 0) {
+        setMsg({ text: '✓ Datos extraídos del comprobante', ok: true });
+      }
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { mensaje?: string } } })?.response?.data?.mensaje;
+      setMsg({ text: msg || 'No se pudo escanear el comprobante', ok: false });
     }
     setScanning(false);
   };
@@ -468,6 +492,14 @@ export default function RemitosPage() {
                   <button className="btn btn-secondary" style={{ fontSize: '.78rem', padding: '.3rem .75rem' }}
                     onClick={() => setDupWarning(false)}>Cancelar</button>
                 </div>
+              </div>
+            )}
+
+            {requiereRevision && scanWarnings.length > 0 && (
+              <div style={{ background: 'var(--amber-dim)', border: '1px solid var(--amber)',
+                borderRadius: 'var(--radius)', padding: '.75rem 1rem', marginTop: '1rem',
+                fontSize: '.82rem', color: 'var(--amber)' }}>
+                ⚠️ Revisá los datos extraídos: {scanWarnings.join(' · ')}
               </div>
             )}
 
