@@ -324,7 +324,7 @@ export default function RegistroPage() {
   };
 
   /* ── Inline form ── */
-  const InlineForm = ({ isEdit }: { isEdit?: boolean }) => (
+  const renderAltaForm = (isEdit?: boolean) => (
     <div className="card">
       <div className="card-title">{isEdit ? `✏️ Editando: ${editando!.apellidoYNombre}` : 'Datos del beneficiario'}</div>
       <div className="form-grid">
@@ -448,7 +448,7 @@ export default function RegistroPage() {
       </div>
 
       {/* ═══ TAB ALTA ═══ */}
-      {tab === 'alta' && (editando ? <InlineForm isEdit /> : <InlineForm />)}
+      {tab === 'alta' && (editando ? renderAltaForm(true) : renderAltaForm())}
 
       {/* ═══ TAB BAJA ═══ */}
       {tab === 'baja' && (

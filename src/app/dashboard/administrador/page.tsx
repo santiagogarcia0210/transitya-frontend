@@ -232,21 +232,28 @@ export default function AdministradorPage() {
     if (!userForm.nombre || !userForm.email) {
       setMsgU({ text: 'Nombre y email son obligatorios', ok: false }); return;
     }
+    const emailInput = document.createElement('input');
+    emailInput.type = 'email';
+    emailInput.value = userForm.email;
+    if (!emailInput.validity.valid) {
+      setMsgU({ text: 'El email no tiene un formato válido', ok: false }); return;
+    }
     setSavingU(true); setMsgU(null);
     try {
       const payload: Record<string, unknown> = {
         nombre: userForm.nombre, email: userForm.email,
         rol: userForm.rol, vehiculo: userForm.vehiculo, activo: userForm.activo,
       };
-      if (!userForm.id && userForm.clave) payload.clave = userForm.clave;
-
       if (userForm.id) {
         await api.put(`/api/usuarios/${userForm.id}`, payload);
       } else {
-        await api.post('/api/usuarios', { ...payload, clave: userForm.clave });
+        await api.post('/api/usuarios', { ...payload, password: userForm.clave });
       }
       cerrarModal(); cargarUsuarios();
-    } catch { setMsgU({ text: 'Error al guardar usuario', ok: false }); }
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { mensaje?: string } } })?.response?.data?.mensaje;
+      setMsgU({ text: msg || 'Error al guardar usuario', ok: false });
+    }
     setSavingU(false);
   };
 
