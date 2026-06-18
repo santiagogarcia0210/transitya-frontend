@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import axios from 'axios';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 
@@ -294,7 +295,10 @@ export default function RegistroPage() {
         setForm(EMPTY);
       }
       cargar();
-    } catch { setMsgAlta({ text: 'Error al guardar. Intentá de nuevo.', ok: false }); }
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.mensaje : undefined;
+      setMsgAlta({ text: msg || 'Error al guardar. Intentá de nuevo.', ok: false });
+    }
     setSaving(false);
   };
 

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import axios from 'axios';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 
@@ -24,7 +25,7 @@ const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: '.78rem', color: 'var(--text3)', marginBottom: '.3rem', fontWeight: 500,
 };
 
-const EMPTY = { id: '', nombre: '', usuario: '', vehiculo: '', telefono: '', licencia: '', email: '' };
+const EMPTY = { id: '', nombre: '', usuario: '', vehiculo: '', telefono: '', licencia: '', email: '', clave: '' };
 
 export default function ChoferesPage() {
   const [lista,         setLista]         = useState<Chofer[]>([]);
@@ -63,7 +64,7 @@ export default function ChoferesPage() {
   const abrirNuevo = () => { setForm(EMPTY); setMsg(null); setShowModal(true); };
   const abrirEdicion = (c: Chofer) => {
     setForm({ id: c.id, nombre: c.nombre, usuario: c.usuario, vehiculo: c.vehiculo,
-      telefono: c.telefono, licencia: c.licencia, email: c.email });
+      telefono: c.telefono, licencia: c.licencia, email: c.email, clave: '' });
     setMsg(null); setShowModal(true);
   };
   const cerrarModal = () => { setShowModal(false); setMsg(null); };
@@ -75,10 +76,13 @@ export default function ChoferesPage() {
       if (form.id) {
         await api.put(`/api/usuarios/${form.id}`, form);
       } else {
-        await api.post('/api/usuarios', { ...form, rol: 'chofer' });
+        await api.post('/api/usuarios', { ...form, rol: 'chofer', password: form.clave });
       }
       cerrarModal(); cargar();
-    } catch { setMsg({ text: 'Error al guardar', ok: false }); }
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.mensaje : undefined;
+      setMsg({ text: msg || 'Error al guardar', ok: false });
+    }
     setSaving(false);
   };
 
@@ -188,6 +192,13 @@ export default function ChoferesPage() {
                   <input type="email" className="input" placeholder="chofer@mail.com" value={form.email} onChange={setF('email')} />
                 </div>
               </div>
+              {!form.id && (
+                <div>
+                  <label style={labelStyle}>Contraseña inicial *</label>
+                  <input type="password" className="input" placeholder="Mínimo 6 caracteres"
+                    value={form.clave} onChange={setF('clave')} />
+                </div>
+              )}
             </div>
             {msg && (
               <p style={{ fontSize: '.82rem', color: msg.ok ? 'var(--green)' : 'var(--red)', marginTop: '.75rem' }}>

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
+import axios from 'axios';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 
@@ -168,7 +169,10 @@ export default function BeneficiariosPage() {
         setForm(EMPTY_FORM);
       }
       cargar();
-    } catch { setMsgAlta({ text: 'Error al guardar. Intentá de nuevo.', ok: false }); }
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.mensaje : undefined;
+      setMsgAlta({ text: msg || 'Error al guardar. Intentá de nuevo.', ok: false });
+    }
     setSaving(false);
   };
 
@@ -197,7 +201,10 @@ export default function BeneficiariosPage() {
       setConfirmBaja(null); setBajaNota('');
       setBajaResult(r => r.filter(b => b.id !== confirmBaja.id));
       cargar();
-    } catch { setMsgBaja({ text: 'Error al dar de baja.', ok: false }); }
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.mensaje : undefined;
+      setMsgBaja({ text: msg || 'Error al dar de baja.', ok: false });
+    }
     setSavingBaja(false);
   };
 
@@ -245,12 +252,15 @@ export default function BeneficiariosPage() {
       await api.put(`/api/beneficiarios/${editando.id}`, payload);
       setMsgEdit({ text: '✅ Actualizado.', ok: true });
       setEditando(null); setForm(EMPTY_FORM); cargar();
-    } catch { setMsgEdit({ text: 'Error al actualizar.', ok: false }); }
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.mensaje : undefined;
+      setMsgEdit({ text: msg || 'Error al actualizar.', ok: false });
+    }
     setSavingEdit(false);
   };
 
   /* ─── Shared: inline form ─── */
-  const InlineForm = ({ isEdit }: { isEdit?: boolean }) => (
+  const renderBenefForm = (isEdit?: boolean) => (
     <div className="card">
       <div className="card-title">{isEdit ? `✏️ Editando: ${fullName(editando!)}` : 'Datos del beneficiario'}</div>
       <div className="form-grid">
@@ -388,9 +398,7 @@ export default function BeneficiariosPage() {
 
       {/* ═══ TAB ALTA ═══ */}
       {tab === 'alta' && (
-        editando
-          ? <InlineForm isEdit />
-          : <InlineForm />
+        editando ? renderBenefForm(true) : renderBenefForm()
       )}
 
       {/* ═══ TAB BAJA ═══ */}
