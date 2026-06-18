@@ -254,10 +254,45 @@ export default function DashboardPage() {
       /* 1. Intentar endpoint resumen */
       let resumenOk = false;
       try {
-        const r = await api.get('/api/dashboard/resumen');
-        const d = serializarFirestore(r.data);
+        const [rResp, chResp] = await Promise.allSettled([
+          api.get('/api/dashboard/resumen'),
+          api.get('/api/usuarios/choferes'),
+        ]);
+        if (rResp.status !== 'fulfilled') throw new Error('resumen failed');
+        const d = serializarFirestore(rResp.value.data);
         // Resumen ok si tiene al menos beneficiariosActivos o totalEgresosMes
         if (d && (typeof d.beneficiariosActivos !== 'undefined' || typeof d.totalEgresosMes !== 'undefined')) {
+          // Lookup reporteHoy + ubicación desde el resumen, indexado por nombre
+          const reporteMap = new Map<string, {reporteHoy:boolean; hace:string; lat?:number; lng?:number}>();
+          (Array.isArray(d.estadoChoferes) ? d.estadoChoferes : []).forEach((c:Record<string,unknown>) => {
+            const k = str(c.nombre??c.usuario??'').toLowerCase().trim();
+            if (k) reporteMap.set(k, {
+              reporteHoy: Boolean(c.reporteHoy??c.reportehoy??c.tieneReporte??false),
+              hace:       str(c.hace??''),
+              lat:        c.lat ? num(c.lat) : undefined,
+              lng:        c.lng ? num(c.lng) : undefined,
+            });
+          });
+          // Fuente canónica: usuarios con rol=chofer (misma fuente que módulo Choferes)
+          const rawChs: Record<string,unknown>[] = chResp.status === 'fulfilled'
+            ? ((chResp.value.data?.choferes ?? []) as Record<string,unknown>[])
+            : [];
+          const estadoChoferes: ChoferEstado[] = rawChs.length > 0
+            ? rawChs.map((c:Record<string,unknown>) => {
+                const nombre = str(c.usuario??c.nombre??'');
+                const info   = reporteMap.get(nombre.toLowerCase().trim());
+                return { nombre, usuario: nombre, vehiculo: str(c.vehiculo??''),
+                  tieneReporte: info?.reporteHoy ?? false,
+                  hace: info?.hace ?? '', lat: info?.lat, lng: info?.lng };
+              })
+            : (Array.isArray(d.estadoChoferes) ? d.estadoChoferes : []).map((c:Record<string,unknown>) => ({
+                nombre: str(c.nombre??c.NOMBRE??c.usuario??c.USUARIO??''),
+                usuario: str(c.usuario??c.USUARIO??''),
+                vehiculo: str(c.vehiculo??c.VEHICULO??c.patente??c.PATENTE??''),
+                tieneReporte: Boolean(c.reporteHoy??c.reportehoy??c.tieneReporte??false),
+                hace: str(c.hace??''), lat: c.lat ? num(c.lat) : undefined,
+                lng: c.lng ? num(c.lng) : undefined,
+              }));
           setTab({
             beneficiariosActivos: num(d.beneficiariosActivos),
             bajasMes:             num(d.bajasMes),
@@ -269,15 +304,7 @@ export default function DashboardPage() {
             totalPresentadoMes:   num(d.totalPresentadoMes),
             kmMes:                num(d.kmMes),
             combustibleMes:       num(d.combustibleMes),
-            estadoChoferes: (Array.isArray(d.estadoChoferes) ? d.estadoChoferes : []).map((c:Record<string,unknown>) => ({
-              nombre:       str(c.nombre??c.NOMBRE??c.usuario??c.USUARIO??''),
-              usuario:      str(c.usuario??c.USUARIO??''),
-              vehiculo:     str(c.vehiculo??c.VEHICULO??c.patente??c.PATENTE??''),
-              tieneReporte: Boolean(c.reporteHoy??c.reportehoy??c.tieneReporte??false),
-              hace:         str(c.hace??''),
-              lat:          c.lat ? num(c.lat) : undefined,
-              lng:          c.lng ? num(c.lng) : undefined,
-            })),
+            estadoChoferes,
             mesNombre:    str(d.mesNombre)||MESES[mes-1],
             anio:         num(d.anio)||anio,
             empresaNombre:str(d.empresaNombre??d.empresa?.nombre??''),
@@ -294,15 +321,15 @@ export default function DashboardPage() {
           api.get('/api/egresos'),
           api.get('/api/ingresos'),
           api.get(`/api/reportes/mensual?mes=${mes}&anio=${anio}`),
-          api.get('/api/usuarios'),
+          api.get('/api/usuarios/choferes'),
         ]);
         const benefs = bResp.status==='fulfilled'?toArray(bResp.value.data).map(serializarFirestore):[];
         const egresos= eResp.status==='fulfilled'?toArray(eResp.value.data).map(serializarFirestore):[];
         const ingresos=iResp.status==='fulfilled'?toArray(iResp.value.data).map(serializarFirestore):[];
         const repMens= rResp.status==='fulfilled'?rResp.value.data:null;
-        const chs    = uResp.status==='fulfilled'
-          ? toArray(uResp.value.data).map(serializarFirestore)
-              .filter((u:Record<string,unknown>)=>str(u.rol??u.ROL??'').toLowerCase()==='chofer'):[];
+        const chs: Record<string,unknown>[] = uResp.status==='fulfilled'
+          ? ((uResp.value.data?.choferes ?? []) as Record<string,unknown>[])
+          : [];
 
         const egMes  = egresos.filter((e:Record<string,unknown>)=>fechaEnMes(getFecha(e),mesStr,anio));
         const ingMes = ingresos.filter((i:Record<string,unknown>)=>fechaEnMes(getFecha(i),mesStr,anio));
@@ -318,9 +345,9 @@ export default function DashboardPage() {
           totalPagadoMes:totPag, totalPresentadoMes:totPres,
           kmMes:num(repMens?.resumen?.kmTotal), combustibleMes:num(repMens?.resumen?.litrosTotal),
           estadoChoferes: chs.map((c:Record<string,unknown>)=>({
-            nombre:str(c.nombre??c.NOMBRE??c.usuario??''), usuario:str(c.usuario??c.USUARIO??''),
-            vehiculo:str(c.vehiculo??c.VEHICULO??''),
-            tieneReporte:Boolean(c.reporteHoy??c.reportehoy??c.tieneReporte??false),
+            nombre:str(c.usuario??c.nombre??''), usuario:str(c.usuario??c.nombre??''),
+            vehiculo:str(c.vehiculo??''),
+            tieneReporte:false,
           })),
           mesNombre:MESES[mes-1], anio, empresaNombre:'',
         });
