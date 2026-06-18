@@ -35,4 +35,14 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    if (err?.response?.data?.error === 'prueba_vencida' && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('prueba-vencida'));
+    }
+    return Promise.reject(err);
+  }
+);
+
 export default api;
