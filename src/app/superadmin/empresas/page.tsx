@@ -5,7 +5,7 @@ import api from '@/lib/api';
 interface Empresa {
   tenantId: string; nombre: string; tipo: string; email: string;
   plan: string; estadoSusc: string; fechaRegistro: string;
-  fechaProximoCobro: string; choferesActivos: number; maxChoferes: number;
+  fechaProximoCobro: string; choferesActivos: number; maxChoferes: number | null;
   activo: boolean; suspendida: boolean;
 }
 
@@ -180,7 +180,14 @@ export default function EmpresasPage() {
                       {e.fechaProximoCobro ? new Date(e.fechaProximoCobro).toLocaleDateString('es-AR') : '—'}
                     </td>
                     <td style={{ padding:'8px 10px' }}><DiasBadge fecha={e.fechaProximoCobro} /></td>
-                    <td style={{ padding:'8px 10px', color:'var(--text2)' }}>{e.choferesActivos}/{e.maxChoferes}</td>
+                    <td style={{ padding:'8px 10px' }}>
+                      <span style={{ color:'var(--text2)' }}>
+                        {e.choferesActivos}/{e.maxChoferes == null ? '∞' : e.maxChoferes}
+                      </span>
+                      {e.maxChoferes != null && e.maxChoferes > 0 && e.choferesActivos > e.maxChoferes && (
+                        <span className="badge badge-red" style={{ marginLeft:'.4rem', fontSize:'.68rem' }}>⚠ Exceso</span>
+                      )}
+                    </td>
                     <td style={{ padding:'8px 10px' }}>
                       <div style={{ display:'flex', gap:'.5rem', alignItems:'center' }}>
                         <button className="btn btn-secondary btn-sm" onClick={() => verDetalle(e.tenantId)}>Ver</button>
