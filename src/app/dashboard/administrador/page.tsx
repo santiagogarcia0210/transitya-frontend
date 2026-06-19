@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import WizardArca from '@/components/WizardArca';
 
 /* ─── Tipos ─────────────────────────────────────────────────────────── */
 
@@ -488,6 +489,7 @@ export default function AdministradorPage() {
 
       {/* ══ Tab Datos Fiscales ════════════════════════════════════════ */}
       {tab === 'fiscal' && (
+        <>
         <div className="card" style={{ padding: '1.5rem', maxWidth: '560px' }}>
           <h3 style={{ fontSize: '.95rem', fontWeight: 700, color: 'var(--text)', marginBottom: '1.25rem' }}>
             🏢 Datos Fiscales de la Empresa
@@ -555,6 +557,14 @@ export default function AdministradorPage() {
             </div>
           )}
         </div>
+        <div style={{ maxWidth: '560px' }}>
+          <WizardArca
+            cuit={fiscal.cuit}
+            condicionIva={fiscal.condicionIVA}
+            onComplete={() => {}}
+          />
+        </div>
+        </>
       )}
 
       {/* ══ Tab Salud del Sistema ══════════════════════════════════════ */}
