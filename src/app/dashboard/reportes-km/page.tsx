@@ -6,23 +6,20 @@ import { serializarFirestore, toArray } from '@/lib/utils';
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-type Tab = 'carga'|'diario'|'mensual';
+type Tab = 'carga' | 'resumen' | 'mensual';
 
-/* ─── Tipos ─────────────────────────────────────────────────────────── */
-
+/* ─── Tipos carga diaria ─────────────────────────────────────────────────── */
 interface ReporteKM {
   id:string; fecha:string; chofer:string; vehiculo:string;
   kmInicial:number; kmFinal:number; kmRecorridos:number;
   combustibleLitros:number; combustibleImporte:number; observaciones:string;
   fotoIniUrl:string; fotoFinUrl:string;
 }
-
 interface FormState {
   id:string; fecha:string; chofer:string; vehiculo:string;
   kmInicial:string; kmFinal:string;
   combustibleLitros:string; combustibleImporte:string; observaciones:string;
 }
-
 interface GrupoChofer {
   chofer:string; vehiculo:string;
   kmTotal:number; litrosTotal:number; costoTotal:number;
@@ -30,15 +27,27 @@ interface GrupoChofer {
   registros:ReporteKM[];
 }
 
-const toBase64Raw = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve((reader.result as string).split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+/* ─── Tipos resumen diario ───────────────────────────────────────────────── */
+interface EgresoR { categoria:string; proveedor:string; monto:number; concepto:string; tipoComprobante:string; }
+interface RemitoR { nroRemito:string; razonSocial:string; combustible:number; monto:number; tipoCombustible:string; }
+interface ChicoR  { nombre:string; domicilio:string; }
+interface ChoferR {
+  email:string; nombre:string; vehiculo:string;
+  km:{ inicial:number; final:number; recorridos:number };
+  montoTotal:number; observaciones:string;
+  egresos:EgresoR[]; remitos:RemitoR[]; chicos:ChicoR[];
+}
+
+/* ─── Utilidades ─────────────────────────────────────────────────────────── */
+const toBase64Raw = (file:File):Promise<string> =>
+  new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve((r.result as string).split(',')[1]);
+    r.onerror=reject;
+    r.readAsDataURL(file);
   });
 
-function normalizar(e: Record<string,unknown>): ReporteKM {
+function normalizar(e:Record<string,unknown>):ReporteKM {
   const ki=Number(e.kmInicial||e['KM INICIAL']||e.km_inicial||0);
   const kf=Number(e.kmFinal||e['KM FINAL']||e.km_final||0);
   return {
@@ -54,35 +63,40 @@ function normalizar(e: Record<string,unknown>): ReporteKM {
   };
 }
 
-const L:React.CSSProperties={display:'block',fontSize:'.78rem',color:'var(--text3)',marginBottom:'.3rem',fontWeight:500};
-const EMPTY:FormState={id:'',fecha:'',chofer:'',vehiculo:'',kmInicial:'',kmFinal:'',combustibleLitros:'',combustibleImporte:'',observaciones:''};
+const hoyISO=()=>{const h=new Date();return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;};
+const $ar=(n:number)=>`$${n.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0})}`;
 
 function mesLabel(ym:string):string{
-  const [y,m]=ym.split('-');
+  const[y,m]=ym.split('-');
   return `${MESES[parseInt(m)-1]||m} ${y}`;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════ */
+const L:React.CSSProperties={display:'block',fontSize:'.78rem',color:'var(--text3)',marginBottom:'.3rem',fontWeight:500};
+const EMPTY:FormState={id:'',fecha:'',chofer:'',vehiculo:'',kmInicial:'',kmFinal:'',combustibleLitros:'',combustibleImporte:'',observaciones:''};
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function ReportesKMPage() {
-  const hoy      = new Date();
-  const anioAct  = hoy.getFullYear();
+  const hoy     = new Date();
+  const anioAct = hoy.getFullYear();
 
   /* Perfil */
-  const [esAdmin, setEsAdmin] = useState(false);
-  const [miNombre,setMiNombre]= useState('');
+  const [esAdmin,    setEsAdmin]    = useState(false);
+  const [miNombre,   setMiNombre]   = useState('');
+  const [miVehiculo, setMiVehiculo] = useState('');
   useEffect(()=>{
     api.get('/api/usuarios/perfil').then(r=>{
       const d=serializarFirestore(r.data);
       setEsAdmin(String(d.rol||'').toLowerCase()==='admin');
       setMiNombre(String(d.nombre||d.usuario||''));
+      setMiVehiculo(String(d.vehiculo||''));
     }).catch(()=>{});
   },[]);
 
-  const [tab, setTab] = useState<Tab>('carga');
+  const [tab,setTab]=useState<Tab>('carga');
 
   /* ═══════════════════════════════════════════════════════════════════════
-     TAB CARGA DIARIA (CRUD existente)
+     TAB CARGA DIARIA
      ═══════════════════════════════════════════════════════════════════════ */
   const [lista,       setLista]       = useState<ReporteKM[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -93,7 +107,6 @@ export default function ReportesKMPage() {
   const [saving,      setSaving]      = useState(false);
   const [confirmDel,  setConfirmDel]  = useState<string|null>(null);
   const [msg,         setMsg]         = useState<{text:string;ok:boolean}|null>(null);
-  /* Fotos odómetro */
   const fileInicioRef = useRef<HTMLInputElement>(null);
   const fileFinRef    = useRef<HTMLInputElement>(null);
   const [fotoIniFile, setFotoIniFile] = useState<File|null>(null);
@@ -103,9 +116,9 @@ export default function ReportesKMPage() {
   const [scanningI,   setScanningI]   = useState(false);
   const [scanningF,   setScanningF]   = useState(false);
 
-  const cargar = async () => {
+  const cargar=async()=>{
     setLoading(true);
-    try{ const r=await api.get('/api/reportes'); setLista(toArray(r.data).map(serializarFirestore).map(normalizar)); }
+    try{const r=await api.get('/api/reportes');setLista(toArray(r.data).map(serializarFirestore).map(normalizar));}
     catch{/*silent*/}finally{setLoading(false);}
   };
   useEffect(()=>{if(tab==='carga')cargar();},[tab]);
@@ -113,10 +126,9 @@ export default function ReportesKMPage() {
   const choferes=[...new Set(lista.map(r=>r.chofer).filter(Boolean))].sort();
   const mesesFiltro=Array.from({length:12},(_,i)=>{
     const d=new Date(anioAct,hoy.getMonth()-i,1);
-    const m=String(d.getMonth()+1).padStart(2,'0'), a=d.getFullYear();
+    const m=String(d.getMonth()+1).padStart(2,'0'),a=d.getFullYear();
     return{value:`${m}-${a}`,label:`${MESES[d.getMonth()]} ${a}`};
   });
-
   const filtrados=lista.filter(r=>{
     if(filtroChofer&&r.chofer!==filtroChofer)return false;
     if(filtroMes){const[m,a]=filtroMes.split('-');if(!r.fecha.includes(`/${m}/${a}`)&&!r.fecha.startsWith(`${a}-${m}`))return false;}
@@ -135,23 +147,27 @@ export default function ReportesKMPage() {
 
   const kmCalc=Math.max(0,(parseFloat(form.kmFinal)||0)-(parseFloat(form.kmInicial)||0));
   const setF=(k:keyof FormState)=>(ev:React.ChangeEvent<HTMLInputElement>)=>setForm(f=>({...f,[k]:ev.target.value}));
-  const abrirNuevo=()=>{setForm({...EMPTY,fecha:new Date().toISOString().split('T')[0]});setFotoIniFile(null);setFotoFinFile(null);setPrevIni('');setPrevFin('');setMsg(null);setShowModal(true);};
-  const abrirEdit=(r:ReporteKM)=>{setForm({id:r.id,fecha:r.fecha,chofer:r.chofer,vehiculo:r.vehiculo,kmInicial:String(r.kmInicial),kmFinal:String(r.kmFinal),combustibleLitros:String(r.combustibleLitros),combustibleImporte:String(r.combustibleImporte),observaciones:r.observaciones});setFotoIniFile(null);setFotoFinFile(null);setPrevIni(r.fotoIniUrl||'');setPrevFin(r.fotoFinUrl||'');setMsg(null);setShowModal(true);};
+
+  const abrirNuevo=()=>{
+    const base={...EMPTY,fecha:hoyISO()};
+    // Autocompletar para choferes
+    if(!esAdmin){base.chofer=miNombre;base.vehiculo=miVehiculo;}
+    setForm(base);
+    setFotoIniFile(null);setFotoFinFile(null);setPrevIni('');setPrevFin('');setMsg(null);setShowModal(true);
+  };
+  const abrirEdit=(r:ReporteKM)=>{
+    setForm({id:r.id,fecha:r.fecha,chofer:r.chofer,vehiculo:r.vehiculo,kmInicial:String(r.kmInicial),kmFinal:String(r.kmFinal),combustibleLitros:String(r.combustibleLitros),combustibleImporte:String(r.combustibleImporte),observaciones:r.observaciones});
+    setFotoIniFile(null);setFotoFinFile(null);setPrevIni(r.fotoIniUrl||'');setPrevFin(r.fotoFinUrl||'');setMsg(null);setShowModal(true);
+  };
   const cerrar=()=>{setShowModal(false);setMsg(null);};
 
   const guardar=async()=>{
     if(!form.fecha||!form.chofer){setMsg({text:'Completá fecha y chofer',ok:false});return;}
     setSaving(true);setMsg(null);
     try{
-      const payload: Record<string,unknown> = {...form, kmRecorridos:String(kmCalc)};
-      if(fotoIniFile){
-        payload.fotoIniBase64 = await toBase64Raw(fotoIniFile);
-        payload.mimeTypeFotos = fotoIniFile.type || 'image/jpeg';
-      }
-      if(fotoFinFile){
-        payload.fotoFinBase64 = await toBase64Raw(fotoFinFile);
-        payload.mimeTypeFotos = fotoFinFile.type || 'image/jpeg';
-      }
+      const payload:Record<string,unknown>={...form,kmRecorridos:String(kmCalc)};
+      if(fotoIniFile){payload.fotoIniBase64=await toBase64Raw(fotoIniFile);payload.mimeTypeFotos=fotoIniFile.type||'image/jpeg';}
+      if(fotoFinFile){payload.fotoFinBase64=await toBase64Raw(fotoFinFile);payload.mimeTypeFotos=fotoFinFile.type||'image/jpeg';}
       form.id?await api.put(`/api/reportes/${form.id}`,payload):await api.post('/api/reportes',payload);
       cerrar();cargar();
     }catch{setMsg({text:'Error al guardar',ok:false});}
@@ -165,17 +181,14 @@ export default function ReportesKMPage() {
     const url=URL.createObjectURL(file);
     if(tipo==='inicio'){setFotoIniFile(file);setPrevIni(url);}
     else{setFotoFinFile(file);setPrevFin(url);}
-    // lanzar scan automáticamente
     escanearOdometroConFile(tipo,file);
   };
-
   const escanearOdometro=async(tipo:'inicio'|'fin')=>{
     const ref=tipo==='inicio'?fileInicioRef:fileFinRef;
     const existingFile=tipo==='inicio'?fotoIniFile:fotoFinFile;
     if(!existingFile){ref.current?.click();return;}
     escanearOdometroConFile(tipo,existingFile);
   };
-
   const escanearOdometroConFile=async(tipo:'inicio'|'fin',file:File)=>{
     tipo==='inicio'?setScanningI(true):setScanningF(true);
     try{
@@ -183,41 +196,44 @@ export default function ReportesKMPage() {
       const b64=btoa(String.fromCharCode(...new Uint8Array(bytes)));
       const r=await api.post('/api/ia/escanear-odometro',{fotoBase64:b64,tipo});
       const km=String(r.data?.km||r.data?.valor||'');
-      if(km) setForm(f=>({...f,[tipo==='inicio'?'kmInicial':'kmFinal']:km}));
+      if(km)setForm(f=>({...f,[tipo==='inicio'?'kmInicial':'kmFinal']:km}));
     }catch{/*silent*/}
     tipo==='inicio'?setScanningI(false):setScanningF(false);
   };
 
   /* ═══════════════════════════════════════════════════════════════════════
-     TAB REPORTE DIARIO
+     TAB RESUMEN DIARIO
      ═══════════════════════════════════════════════════════════════════════ */
-  const [diaISO,    setDiaISO]    = useState(new Date().toISOString().split('T')[0]);
-  const [diaData,   setDiaData]   = useState<ReporteKM[]>([]);
-  const [loadingD,  setLoadingD]  = useState(false);
+  const [resumenFecha,   setResumenFecha]   = useState(hoyISO());
+  const [resumenData,    setResumenData]    = useState<ChoferR[]>([]);
+  const [loadingR,       setLoadingR]       = useState(false);
+  const [resumenErr,     setResumenErr]     = useState('');
+  const [choferSelIdx,   setChoferSelIdx]   = useState(0);
 
-  const isoToES=(iso:string)=>{const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`;};
-
-  const cargarDiario=useCallback(async(iso:string)=>{
-    setLoadingD(true);
+  const cargarResumen=useCallback(async(fecha:string)=>{
+    setLoadingR(true);setResumenErr('');setChoferSelIdx(0);
     try{
-      const r=await api.get(`/api/reportes/diario?fecha=${encodeURIComponent(isoToES(iso))}`);
-      setDiaData(toArray(r.data).map(serializarFirestore).map(normalizar));
-    }catch{setDiaData([]);}
-    setLoadingD(false);
+      const r=await api.get(`/api/reportes-km/resumen-diario?fecha=${fecha}`);
+      setResumenData(r.data?.choferes||[]);
+    }catch(e:unknown){
+      const msg=e instanceof Error?e.message:'Error al cargar el resumen';
+      setResumenErr(msg);
+      setResumenData([]);
+    }
+    setLoadingR(false);
   },[]);
 
-  useEffect(()=>{if(tab==='diario')cargarDiario(diaISO);},[diaISO,tab,cargarDiario]);
+  useEffect(()=>{if(tab==='resumen')cargarResumen(resumenFecha);},[tab,resumenFecha,cargarResumen]);
 
-  // Si es chofer, filtrar solo sus registros
-  const diaFiltrado=esAdmin?diaData:diaData.filter(r=>r.chofer===miNombre);
+  const choferActivo:ChoferR|null=resumenData[choferSelIdx]??null;
 
   /* ═══════════════════════════════════════════════════════════════════════
      TAB REPORTE MENSUAL
      ═══════════════════════════════════════════════════════════════════════ */
-  const [repMes,    setRepMes]    = useState(hoy.getMonth()+1);
-  const [repAnio,   setRepAnio]   = useState(anioAct);
-  const [grupos,    setGrupos]    = useState<GrupoChofer[]>([]);
-  const [loadingM,  setLoadingM]  = useState(false);
+  const [repMes,   setRepMes]   = useState(hoy.getMonth()+1);
+  const [repAnio,  setRepAnio]  = useState(anioAct);
+  const [grupos,   setGrupos]   = useState<GrupoChofer[]>([]);
+  const [loadingM, setLoadingM] = useState(false);
 
   const cargarMensual=useCallback(async(mes:number,anio:number)=>{
     setLoadingM(true);
@@ -225,12 +241,10 @@ export default function ReportesKMPage() {
       const r=await api.get(`/api/reportes/mensual?mes=${mes}&anio=${anio}`);
       const d=serializarFirestore(r.data);
       const regs:ReporteKM[]=toArray(d.registros??d.data??d).map(serializarFirestore).map(normalizar);
-      // Agrupar por chofer
       const map:Record<string,ReporteKM[]>={};
       regs.forEach(reg=>{if(!map[reg.chofer])map[reg.chofer]=[];map[reg.chofer].push(reg);});
       setGrupos(Object.entries(map).map(([chofer,rs])=>({
-        chofer,
-        vehiculo:rs[0]?.vehiculo||'',
+        chofer,vehiculo:rs[0]?.vehiculo||'',
         kmTotal:rs.reduce((s,x)=>s+x.kmRecorridos,0),
         litrosTotal:rs.reduce((s,x)=>s+x.combustibleLitros,0),
         costoTotal:rs.reduce((s,x)=>s+x.combustibleImporte,0),
@@ -244,7 +258,6 @@ export default function ReportesKMPage() {
 
   useEffect(()=>{if(tab==='mensual')cargarMensual(repMes,repAnio);},[repMes,repAnio,tab,cargarMensual]);
 
-  // Si es chofer filtrar
   const gruposFiltrados=esAdmin?grupos:grupos.filter(g=>g.chofer===miNombre);
   const totalesMens={
     km:gruposFiltrados.reduce((s,g)=>s+g.kmTotal,0),
@@ -253,9 +266,9 @@ export default function ReportesKMPage() {
     dias:gruposFiltrados.reduce((s,g)=>s+g.diasTrabajados,0),
   };
 
-  /* ─── Render ──────────────────────────────────────────────────────── */
+  /* ─── Render ──────────────────────────────────────────────────────────── */
   return (
-    <div>
+    <div style={{paddingBottom:'2rem'}}>
       <div className="section-header" style={{marginBottom:'1rem'}}>
         <h2 className="section-title">🛣️ Reportes KM</h2>
       </div>
@@ -263,8 +276,8 @@ export default function ReportesKMPage() {
       {/* Tabs */}
       <div style={{display:'flex',gap:'.35rem',flexWrap:'wrap',marginBottom:'1.25rem',borderBottom:'1px solid var(--border)',paddingBottom:'.75rem'}}>
         {([
-          {key:'carga' as Tab, label:'📝 Carga diaria'},
-          {key:'diario' as Tab,label:'📊 Reporte diario'},
+          {key:'carga'   as Tab,label:'📝 Carga diaria'},
+          {key:'resumen' as Tab,label:'📊 Resumen diario'},
           {key:'mensual' as Tab,label:'📅 Reporte mensual'},
         ] as {key:Tab;label:string}[]).map(t=>(
           <button key={t.key} className={tab===t.key?'btn btn-primary':'btn btn-secondary'}
@@ -272,7 +285,7 @@ export default function ReportesKMPage() {
         ))}
       </div>
 
-      {/* ══ TAB CARGA DIARIA ══════════════════════════════════════════ */}
+      {/* ══ TAB CARGA DIARIA ══════════════════════════════════════════════ */}
       {tab==='carga'&&(
         <div>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem',flexWrap:'wrap',gap:'.5rem'}}>
@@ -294,7 +307,10 @@ export default function ReportesKMPage() {
               <option value="">Todos los meses</option>
               {mesesFiltro.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
-            {(filtroChofer||filtroMes)&&<button className="btn btn-secondary" style={{fontSize:'.78rem'}} onClick={()=>{setFiltroChofer('');setFiltroMes('');}}>✕</button>}
+            {(filtroChofer||filtroMes)&&(
+              <button className="btn btn-secondary" style={{fontSize:'.78rem'}}
+                onClick={()=>{setFiltroChofer('');setFiltroMes('');}}>✕</button>
+            )}
           </div>
 
           {loading?(
@@ -321,11 +337,11 @@ export default function ReportesKMPage() {
                           </p>
                           {(r.fotoIniUrl||r.fotoFinUrl)&&(
                             <div style={{display:'flex',gap:4,marginTop:4}}>
-                              {r.fotoIniUrl&&<img src={r.fotoIniUrl} alt="KM inicial" title="Foto KM inicial"
+                              {r.fotoIniUrl&&<img src={r.fotoIniUrl} alt="KM inicial"
                                 style={{width:36,height:36,objectFit:'cover',borderRadius:4,border:'1px solid var(--border)',flexShrink:0}}
                                 onClick={ev=>{ev.stopPropagation();window.open(r.fotoIniUrl,'_blank');}}
                                 onError={ev=>(ev.currentTarget.style.display='none')}/>}
-                              {r.fotoFinUrl&&<img src={r.fotoFinUrl} alt="KM final" title="Foto KM final"
+                              {r.fotoFinUrl&&<img src={r.fotoFinUrl} alt="KM final"
                                 style={{width:36,height:36,objectFit:'cover',borderRadius:4,border:'1px solid var(--border)',flexShrink:0}}
                                 onClick={ev=>{ev.stopPropagation();window.open(r.fotoFinUrl,'_blank');}}
                                 onError={ev=>(ev.currentTarget.style.display='none')}/>}
@@ -361,9 +377,19 @@ export default function ReportesKMPage() {
                 <div className="form-grid">
                   <div className="form-grid form-grid-2">
                     <div><label style={L}>Fecha *</label><input type="date" className="input" value={form.fecha} onChange={setF('fecha')}/></div>
-                    <div><label style={L}>Chofer *</label><input className="input" placeholder="Nombre" value={form.chofer} onChange={setF('chofer')}/></div>
+                    <div>
+                      <label style={L}>Chofer *</label>
+                      <input className="input" placeholder="Nombre" value={form.chofer} onChange={setF('chofer')}
+                        readOnly={!esAdmin}
+                        style={!esAdmin?{opacity:.7,cursor:'not-allowed'}:undefined}/>
+                    </div>
                   </div>
-                  <div><label style={L}>Vehículo</label><input className="input" placeholder="Ej: AA123BB" value={form.vehiculo} onChange={setF('vehiculo')}/></div>
+                  <div>
+                    <label style={L}>Vehículo</label>
+                    <input className="input" placeholder="Ej: AA123BB" value={form.vehiculo} onChange={setF('vehiculo')}
+                      readOnly={!esAdmin&&!!miVehiculo}
+                      style={(!esAdmin&&!!miVehiculo)?{opacity:.7,cursor:'not-allowed'}:undefined}/>
+                  </div>
                   <div className="form-grid form-grid-2">
                     <div>
                       <label style={L}>KM Inicial</label>
@@ -393,7 +419,7 @@ export default function ReportesKMPage() {
                   <div><label style={L}>KM Recorridos (calculado)</label>
                     <input type="number" className="input" value={kmCalc} readOnly style={{opacity:.6,cursor:'not-allowed'}}/></div>
                   <div className="form-grid form-grid-2">
-                    <div><label style={L}>Combustible (litros)</label><input type="number" className="input" placeholder="0" value={form.combustibleLitros} onChange={setF('combustibleLitros')}/></div>
+                    <div><label style={L}>Remitos (litros)</label><input type="number" className="input" placeholder="0" value={form.combustibleLitros} onChange={setF('combustibleLitros')}/></div>
                     <div><label style={L}>Combustible ($)</label><input type="number" className="input" placeholder="0" value={form.combustibleImporte} onChange={setF('combustibleImporte')}/></div>
                   </div>
                   <div><label style={L}>Observaciones</label><input className="input" placeholder="Opcional…" value={form.observaciones} onChange={setF('observaciones')}/></div>
@@ -411,73 +437,63 @@ export default function ReportesKMPage() {
         </div>
       )}
 
-      {/* ══ TAB REPORTE DIARIO ════════════════════════════════════════ */}
-      {tab==='diario'&&(
+      {/* ══ TAB RESUMEN DIARIO ════════════════════════════════════════════ */}
+      {tab==='resumen'&&(
         <div>
-          <div style={{display:'flex',gap:'1rem',alignItems:'flex-end',marginBottom:'1.25rem',flexWrap:'wrap'}}>
+          {/* Controles: fecha + refresh */}
+          <div style={{display:'flex',gap:'.75rem',alignItems:'flex-end',marginBottom:'1.5rem',flexWrap:'wrap'}}>
             <div>
               <label style={L}>Fecha</label>
-              <input type="date" className="input" style={{width:160}} value={diaISO} onChange={e=>setDiaISO(e.target.value)}/>
+              <input type="date" className="input" style={{width:170}} value={resumenFecha}
+                onChange={e=>setResumenFecha(e.target.value)}/>
             </div>
-            <button className="btn btn-secondary" onClick={()=>cargarDiario(diaISO)} disabled={loadingD}>↻</button>
-            <span style={{fontSize:'.82rem',color:'var(--text3)',alignSelf:'center'}}>
-              {new Date(diaISO+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'})}
-            </span>
+            <button className="btn btn-secondary" onClick={()=>cargarResumen(resumenFecha)} disabled={loadingR}
+              style={{fontSize:'.82rem'}}>↻ Actualizar</button>
           </div>
 
-          {loadingD?(
-            <div style={{display:'flex',alignItems:'center',gap:'.75rem',color:'var(--text3)',padding:'2rem'}}><span className="spinner"/> Cargando…</div>
-          ):diaFiltrado.length===0?(
-            <div className="empty-state"><div className="empty-icon">📊</div><p>Sin reportes para este día</p></div>
-          ):(
+          {loadingR&&(
+            <div style={{display:'flex',alignItems:'center',gap:'.75rem',color:'var(--text3)',padding:'2rem'}}>
+              <span className="spinner"/> Cargando resumen…
+            </div>
+          )}
+
+          {!loadingR&&resumenErr&&(
+            <div className="card" style={{borderColor:'var(--red-dim)',background:'var(--red-dim)',color:'var(--red)',padding:'1rem'}}>
+              ⚠️ {resumenErr}
+            </div>
+          )}
+
+          {!loadingR&&!resumenErr&&resumenData.length===0&&(
+            <div className="empty-state">
+              <div className="empty-icon">📊</div>
+              <p>Sin actividad registrada para esta fecha</p>
+              <p style={{fontSize:'.8rem',color:'var(--text3)',marginTop:'.5rem'}}>Probá con otra fecha o verificá que haya egresos, remitos o reportes KM cargados.</p>
+            </div>
+          )}
+
+          {!loadingR&&!resumenErr&&resumenData.length>0&&(
             <div>
-              {/* Resumen del día */}
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:'1rem',marginBottom:'1.25rem'}}>
-                {[
-                  {l:'KM totales',  v:`${diaFiltrado.reduce((s,r)=>s+r.kmRecorridos,0).toLocaleString('es-AR')} km`,c:'var(--purple)'},
-                  {l:'Litros',      v:`${diaFiltrado.reduce((s,r)=>s+r.combustibleLitros,0).toLocaleString('es-AR')} L`,c:'var(--amber)'},
-                  {l:'Costo comb.', v:`$${diaFiltrado.reduce((s,r)=>s+r.combustibleImporte,0).toLocaleString('es-AR')}`,c:'var(--red)'},
-                  {l:'Choferes',    v:String(diaFiltrado.length),c:'var(--blue)'},
-                ].map(s=>(
-                  <div key={s.l} className="stat-card">
-                    <p className="stat-label">{s.l}</p>
-                    <p className="stat-value" style={{color:s.c,fontSize:'1.5rem'}}>{s.v}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="tabla-wrap">
-                <table className="tabla">
-                  <thead>
-                    <tr>
-                      <th>Chofer</th><th>Vehículo</th>
-                      <th style={{textAlign:'center'}}>KM Inicial</th>
-                      <th style={{textAlign:'center'}}>KM Final</th>
-                      <th style={{textAlign:'center'}}>KM Rec.</th>
-                      <th style={{textAlign:'center'}}>Litros</th>
-                      <th style={{textAlign:'center'}}>Costo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {diaFiltrado.map(r=>(
-                      <tr key={r.id}>
-                        <td style={{fontWeight:500,color:'var(--text)'}}>{r.chofer||'—'}</td>
-                        <td>{r.vehiculo||'—'}</td>
-                        <td style={{textAlign:'center'}}>{r.kmInicial.toLocaleString('es-AR')}</td>
-                        <td style={{textAlign:'center'}}>{r.kmFinal.toLocaleString('es-AR')}</td>
-                        <td style={{textAlign:'center',fontWeight:700,color:'var(--purple)'}}>{r.kmRecorridos.toLocaleString('es-AR')}</td>
-                        <td style={{textAlign:'center'}}>{r.combustibleLitros>0?`${r.combustibleLitros} L`:'—'}</td>
-                        <td style={{textAlign:'center'}}>{r.combustibleImporte>0?`$${r.combustibleImporte.toLocaleString('es-AR')}`:'—'}</td>
-                      </tr>
+              {/* Selector de chofer */}
+              {resumenData.length>1&&(
+                <div style={{marginBottom:'1.25rem'}}>
+                  <label style={L}>Chofer</label>
+                  <select className="select" style={{maxWidth:320}}
+                    value={choferSelIdx}
+                    onChange={e=>setChoferSelIdx(Number(e.target.value))}>
+                    {resumenData.map((c,i)=>(
+                      <option key={c.email} value={i}>{c.nombre}{c.vehiculo?` — ${c.vehiculo}`:''}</option>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </select>
+                </div>
+              )}
+
+              {choferActivo&&<ChoferCard chofer={choferActivo}/>}
             </div>
           )}
         </div>
       )}
 
-      {/* ══ TAB REPORTE MENSUAL ═══════════════════════════════════════ */}
+      {/* ══ TAB REPORTE MENSUAL ═══════════════════════════════════════════ */}
       {tab==='mensual'&&(
         <div>
           <div style={{display:'flex',gap:'1rem',alignItems:'flex-end',marginBottom:'1.25rem',flexWrap:'wrap'}}>
@@ -500,13 +516,12 @@ export default function ReportesKMPage() {
             <div className="empty-state"><div className="empty-icon">📅</div><p>Sin datos para {MESES[repMes-1]} {repAnio}</p></div>
           ):(
             <div>
-              {/* Totales generales */}
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
                 {[
-                  {l:'KM total',     v:`${totalesMens.km.toLocaleString('es-AR')} km`,   c:'var(--purple)'},
-                  {l:'Litros total', v:`${totalesMens.litros.toLocaleString('es-AR')} L`, c:'var(--amber)'},
-                  {l:'Costo total',  v:`$${totalesMens.costo.toLocaleString('es-AR')}`,   c:'var(--red)'},
-                  {l:'Días trabajados',v:String(totalesMens.dias),                         c:'var(--blue)'},
+                  {l:'KM total',     v:`${totalesMens.km.toLocaleString('es-AR')} km`,  c:'var(--purple)'},
+                  {l:'Litros total', v:`${totalesMens.litros.toLocaleString('es-AR')} L`,c:'var(--amber)'},
+                  {l:'Costo total',  v:`$${totalesMens.costo.toLocaleString('es-AR')}`,  c:'var(--red)'},
+                  {l:'Días trabajados',v:String(totalesMens.dias),                        c:'var(--blue)'},
                 ].map(s=>(
                   <div key={s.l} className="stat-card">
                     <p className="stat-label">{s.l}</p>
@@ -514,8 +529,6 @@ export default function ReportesKMPage() {
                   </div>
                 ))}
               </div>
-
-              {/* Tabla por chofer */}
               <div className="tabla-wrap">
                 <table className="tabla">
                   <thead>
@@ -547,6 +560,153 @@ export default function ReportesKMPage() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ChoferCard — vista detallada de un chofer en el resumen diario
+   ═══════════════════════════════════════════════════════════════════════════ */
+function ChoferCard({chofer}:{chofer:ChoferR}) {
+  const $ar=(n:number)=>`$${n.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+
+  return (
+    <div>
+      {/* Cabecera del chofer */}
+      <div className="card" style={{marginBottom:'1rem',padding:'1.25rem 1.5rem'}}>
+        <div style={{display:'flex',flexWrap:'wrap',gap:'1rem',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <p style={{fontWeight:700,fontSize:'1.05rem',color:'var(--text)'}}>{chofer.nombre}</p>
+            {chofer.vehiculo&&(
+              <p style={{fontSize:'.83rem',color:'var(--text3)',marginTop:'.2rem'}}>🚗 {chofer.vehiculo}</p>
+            )}
+          </div>
+          <div style={{display:'flex',gap:'1.5rem',flexWrap:'wrap'}}>
+            <div style={{textAlign:'center'}}>
+              <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>KM Inicial</p>
+              <p style={{fontSize:'1.1rem',fontWeight:700,color:'var(--text2)'}}>{chofer.km.inicial.toLocaleString('es-AR')}</p>
+            </div>
+            <div style={{textAlign:'center'}}>
+              <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>KM Final</p>
+              <p style={{fontSize:'1.1rem',fontWeight:700,color:'var(--text2)'}}>{chofer.km.final.toLocaleString('es-AR')}</p>
+            </div>
+            <div style={{textAlign:'center'}}>
+              <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>Recorridos</p>
+              <p style={{fontSize:'1.25rem',fontWeight:800,color:'var(--purple)'}}>{chofer.km.recorridos.toLocaleString('es-AR')} km</p>
+            </div>
+            <div style={{textAlign:'center'}}>
+              <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>Monto total</p>
+              <p style={{fontSize:'1.25rem',fontWeight:800,color:'var(--green)'}}>{$ar(chofer.montoTotal)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Egresos + Remitos — side by side en desktop */}
+      <div style={{display:'flex',gap:'1rem',flexWrap:'wrap',marginBottom:'1rem'}}>
+
+        {/* Cuadro 1: Egresos */}
+        <div className="card" style={{flex:'1',minWidth:'260px',padding:'1.25rem'}}>
+          <p style={{fontSize:'.75rem',fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:'.85rem'}}>
+            💳 Egresos
+          </p>
+          {chofer.egresos.length===0?(
+            <p style={{fontSize:'.83rem',color:'var(--text3)',fontStyle:'italic'}}>Sin egresos registrados</p>
+          ):(
+            <div style={{display:'flex',flexDirection:'column',gap:'.55rem'}}>
+              {chofer.egresos.map((e,i)=>(
+                <div key={i} style={{padding:'.65rem .85rem',background:'var(--bg4)',borderRadius:'var(--radius)',border:'1px solid var(--border)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'.5rem'}}>
+                    <div style={{minWidth:0}}>
+                      <p style={{fontSize:'.82rem',fontWeight:600,color:'var(--text)',marginBottom:'.1rem'}}>
+                        {e.categoria||'Sin categoría'}
+                      </p>
+                      {e.proveedor&&<p style={{fontSize:'.75rem',color:'var(--text3)'}}>{e.proveedor}</p>}
+                      {e.concepto&&<p style={{fontSize:'.75rem',color:'var(--text3)'}}>{e.concepto}</p>}
+                      {e.tipoComprobante&&(
+                        <span className="badge badge-gray" style={{marginTop:'.3rem',fontSize:'.68rem'}}>{e.tipoComprobante}</span>
+                      )}
+                    </div>
+                    <p style={{fontWeight:700,color:'var(--amber)',whiteSpace:'nowrap',fontSize:'.9rem',flexShrink:0}}>{$ar(e.monto)}</p>
+                  </div>
+                </div>
+              ))}
+              <div style={{borderTop:'1px solid var(--border)',paddingTop:'.6rem',marginTop:'.2rem',display:'flex',justifyContent:'flex-end'}}>
+                <p style={{fontSize:'.82rem',fontWeight:700,color:'var(--amber)'}}>
+                  Total: {$ar(chofer.egresos.reduce((s,e)=>s+e.monto,0))}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Cuadro 2: Remitos */}
+        <div className="card" style={{flex:'1',minWidth:'260px',padding:'1.25rem'}}>
+          <p style={{fontSize:'.75rem',fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:'.85rem'}}>
+            ⛽ Remitos
+          </p>
+          {chofer.remitos.length===0?(
+            <p style={{fontSize:'.83rem',color:'var(--text3)',fontStyle:'italic'}}>Sin remitos registrados</p>
+          ):(
+            <div style={{display:'flex',flexDirection:'column',gap:'.55rem'}}>
+              {chofer.remitos.map((r,i)=>(
+                <div key={i} style={{padding:'.65rem .85rem',background:'var(--bg4)',borderRadius:'var(--radius)',border:'1px solid var(--border)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'.5rem'}}>
+                    <div style={{minWidth:0}}>
+                      {r.nroRemito&&<p style={{fontSize:'.75rem',color:'var(--text3)',marginBottom:'.1rem'}}>N° {r.nroRemito}</p>}
+                      <p style={{fontSize:'.82rem',fontWeight:600,color:'var(--text)',marginBottom:'.1rem'}}>
+                        {r.razonSocial||'Sin proveedor'}
+                      </p>
+                      <p style={{fontSize:'.75rem',color:'var(--text3)'}}>
+                        {r.tipoCombustible||'—'}{r.combustible>0?` · ${r.combustible} L`:''}
+                      </p>
+                    </div>
+                    <p style={{fontWeight:700,color:'var(--amber)',whiteSpace:'nowrap',fontSize:'.9rem',flexShrink:0}}>{$ar(r.monto)}</p>
+                  </div>
+                </div>
+              ))}
+              <div style={{borderTop:'1px solid var(--border)',paddingTop:'.6rem',marginTop:'.2rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <p style={{fontSize:'.78rem',color:'var(--text3)'}}>
+                  {chofer.remitos.reduce((s,r)=>s+r.combustible,0).toLocaleString('es-AR')} L total
+                </p>
+                <p style={{fontSize:'.82rem',fontWeight:700,color:'var(--amber)'}}>
+                  Total: {$ar(chofer.remitos.reduce((s,r)=>s+r.monto,0))}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Observaciones */}
+      {chofer.observaciones&&(
+        <div className="card" style={{marginBottom:'1rem',padding:'1rem 1.25rem',borderLeft:'3px solid var(--border2)'}}>
+          <p style={{fontSize:'.72rem',fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:'.4rem'}}>📝 Observaciones</p>
+          <p style={{fontSize:'.88rem',color:'var(--text2)'}}>{chofer.observaciones}</p>
+        </div>
+      )}
+
+      {/* Chicos / Beneficiarios */}
+      <div className="card" style={{padding:'1.25rem'}}>
+        <p style={{fontSize:'.75rem',fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:'.85rem'}}>
+          👥 Beneficiarios del día
+          {chofer.chicos.length>0&&(
+            <span style={{marginLeft:'.5rem',color:'var(--blue-bright)',fontWeight:600}}>{chofer.chicos.length}</span>
+          )}
+        </p>
+        {chofer.chicos.length===0?(
+          <p style={{fontSize:'.83rem',color:'var(--text3)',fontStyle:'italic'}}>Sin asistencia asignada para esta fecha</p>
+        ):(
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'.5rem'}}>
+            {chofer.chicos.map((b,i)=>(
+              <div key={i} style={{padding:'.55rem .75rem',background:'var(--bg4)',borderRadius:'var(--radius)',border:'1px solid var(--border)'}}>
+                <p style={{fontSize:'.83rem',fontWeight:600,color:'var(--text)'}}>{b.nombre}</p>
+                {b.domicilio&&<p style={{fontSize:'.73rem',color:'var(--text3)',marginTop:'.1rem'}}>{b.domicilio}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
