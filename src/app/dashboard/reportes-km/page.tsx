@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
-import { exportarResumenPDF } from '@/lib/pdfResumen';
+import { exportarResumenPDF, exportarResumenMensualPDF } from '@/lib/pdfResumen';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -21,20 +21,15 @@ interface FormState {
   kmInicial:string; kmFinal:string;
   combustibleLitros:string; combustibleImporte:string; observaciones:string;
 }
-interface GrupoChofer {
-  chofer:string; vehiculo:string;
-  kmTotal:number; litrosTotal:number; costoTotal:number;
-  diasTrabajados:number; kmPromedio:number;
-  registros:ReporteKM[];
-}
 
-/* ─── Tipos resumen diario ───────────────────────────────────────────────── */
-interface EgresoR { categoria:string; proveedor:string; monto:number; concepto:string; tipoComprobante:string; }
-interface RemitoR { nroRemito:string; razonSocial:string; combustible:number; monto:number; tipoCombustible:string; }
-interface ChicoR  { nombre:string; domicilio:string; }
+/* ─── Tipos resumen diario / mensual ─────────────────────────────────────── */
+interface EgresoR { fecha?:string; categoria:string; proveedor:string; monto:number; concepto:string; tipoComprobante:string; }
+interface RemitoR { fecha?:string; nroRemito:string; razonSocial:string; combustible:number; monto:number; tipoCombustible:string; }
+interface ChicoR  { nombre:string; domicilio:string; diasTransportado?:number; }
 interface ChoferR {
   email:string; nombre:string; vehiculo:string;
   km:{ inicial:number; final:number; recorridos:number };
+  diasActivos?:number;
   montoTotal:number; observaciones:string;
   egresos:EgresoR[]; remitos:RemitoR[]; chicos:ChicoR[];
 }
@@ -237,41 +232,29 @@ export default function ReportesKMPage() {
   /* ═══════════════════════════════════════════════════════════════════════
      TAB REPORTE MENSUAL
      ═══════════════════════════════════════════════════════════════════════ */
-  const [repMes,   setRepMes]   = useState(hoy.getMonth()+1);
-  const [repAnio,  setRepAnio]  = useState(anioAct);
-  const [grupos,   setGrupos]   = useState<GrupoChofer[]>([]);
-  const [loadingM, setLoadingM] = useState(false);
+  const hoyMes=`${anioAct}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
+  const [mensualMes,       setMensualMes]      = useState(hoyMes);
+  const [mensualData,      setMensualData]     = useState<ChoferR[]>([]);
+  const [loadingM,         setLoadingM]        = useState(false);
+  const [mensualErr,       setMensualErr]      = useState('');
+  const [mensualChoferIdx, setMensualChoferIdx]= useState(0);
 
-  const cargarMensual=useCallback(async(mes:number,anio:number)=>{
-    setLoadingM(true);
+  const cargarMensual=useCallback(async(mes:string)=>{
+    setLoadingM(true);setMensualErr('');setMensualChoferIdx(0);
     try{
-      const r=await api.get(`/api/reportes/mensual?mes=${mes}&anio=${anio}`);
-      const d=serializarFirestore(r.data);
-      const regs:ReporteKM[]=toArray(d.registros??d.data??d).map(serializarFirestore).map(normalizar);
-      const map:Record<string,ReporteKM[]>={};
-      regs.forEach(reg=>{if(!map[reg.chofer])map[reg.chofer]=[];map[reg.chofer].push(reg);});
-      setGrupos(Object.entries(map).map(([chofer,rs])=>({
-        chofer,vehiculo:rs[0]?.vehiculo||'',
-        kmTotal:rs.reduce((s,x)=>s+x.kmRecorridos,0),
-        litrosTotal:rs.reduce((s,x)=>s+x.combustibleLitros,0),
-        costoTotal:rs.reduce((s,x)=>s+x.combustibleImporte,0),
-        diasTrabajados:rs.length,
-        kmPromedio:rs.length>0?Math.round(rs.reduce((s,x)=>s+x.kmRecorridos,0)/rs.length):0,
-        registros:rs,
-      })));
-    }catch{setGrupos([]);}
+      const r=await api.get(`/api/reportes-km/resumen-mensual?mes=${mes}`);
+      setMensualData(r.data?.choferes||[]);
+    }catch(e:unknown){
+      const errMsg=e instanceof Error?e.message:'Error al cargar el reporte mensual';
+      setMensualErr(errMsg);
+      setMensualData([]);
+    }
     setLoadingM(false);
   },[]);
 
-  useEffect(()=>{if(tab==='mensual')cargarMensual(repMes,repAnio);},[repMes,repAnio,tab,cargarMensual]);
+  useEffect(()=>{if(tab==='mensual')cargarMensual(mensualMes);},[tab,mensualMes,cargarMensual]);
 
-  const gruposFiltrados=esAdmin?grupos:grupos.filter(g=>g.chofer===miNombre);
-  const totalesMens={
-    km:gruposFiltrados.reduce((s,g)=>s+g.kmTotal,0),
-    litros:gruposFiltrados.reduce((s,g)=>s+g.litrosTotal,0),
-    costo:gruposFiltrados.reduce((s,g)=>s+g.costoTotal,0),
-    dias:gruposFiltrados.reduce((s,g)=>s+g.diasTrabajados,0),
-  };
+  const mensualChoferActivo:ChoferR|null=mensualData[mensualChoferIdx]??null;
 
   /* ─── Render ──────────────────────────────────────────────────────────── */
   return (
@@ -506,63 +489,44 @@ export default function ReportesKMPage() {
           <div style={{display:'flex',gap:'1rem',alignItems:'flex-end',marginBottom:'1.25rem',flexWrap:'wrap'}}>
             <div>
               <label style={L}>Mes</label>
-              <select className="select" style={{width:140}} value={repMes} onChange={e=>setRepMes(Number(e.target.value))}>
-                {MESES.map((m,i)=><option key={i} value={i+1}>{m}</option>)}
-              </select>
+              <input type="month" className="input" style={{width:164}} value={mensualMes}
+                onChange={e=>setMensualMes(e.target.value)}/>
             </div>
-            <div>
-              <label style={L}>Año</label>
-              <input type="number" className="input" style={{width:100}} value={repAnio} onChange={e=>setRepAnio(Number(e.target.value))}/>
-            </div>
-            <button className="btn btn-secondary" onClick={()=>cargarMensual(repMes,repAnio)} disabled={loadingM}>↻</button>
+            <button className="btn btn-secondary" onClick={()=>cargarMensual(mensualMes)} disabled={loadingM}
+              style={{padding:'.45rem .9rem'}}>↻</button>
           </div>
 
-          {loadingM?(
-            <div style={{display:'flex',alignItems:'center',gap:'.75rem',color:'var(--text3)',padding:'2rem'}}><span className="spinner"/> Cargando…</div>
-          ):gruposFiltrados.length===0?(
-            <div className="empty-state"><div className="empty-icon">📅</div><p>Sin datos para {MESES[repMes-1]} {repAnio}</p></div>
-          ):(
+          {loadingM&&(
+            <div style={{display:'flex',alignItems:'center',gap:'.75rem',color:'var(--text3)',padding:'2rem'}}>
+              <span className="spinner"/> Cargando…
+            </div>
+          )}
+          {!loadingM&&mensualErr&&(
+            <div className="alert alert-error">{mensualErr}</div>
+          )}
+          {!loadingM&&!mensualErr&&mensualData.length===0&&(
+            <div className="empty-state">
+              <div className="empty-icon">📅</div>
+              <p>Sin datos para {mesLabel(mensualMes)}</p>
+            </div>
+          )}
+          {!loadingM&&!mensualErr&&mensualData.length>0&&(
             <div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
-                {[
-                  {l:'KM total',     v:`${totalesMens.km.toLocaleString('es-AR')} km`,  c:'var(--purple)'},
-                  {l:'Litros total', v:`${totalesMens.litros.toLocaleString('es-AR')} L`,c:'var(--amber)'},
-                  {l:'Costo total',  v:`$${totalesMens.costo.toLocaleString('es-AR')}`,  c:'var(--red)'},
-                  {l:'Días trabajados',v:String(totalesMens.dias),                        c:'var(--blue)'},
-                ].map(s=>(
-                  <div key={s.l} className="stat-card">
-                    <p className="stat-label">{s.l}</p>
-                    <p className="stat-value" style={{color:s.c,fontSize:'1.5rem'}}>{s.v}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="tabla-wrap">
-                <table className="tabla">
-                  <thead>
-                    <tr>
-                      <th>Chofer</th><th>Vehículo</th>
-                      <th style={{textAlign:'center'}}>Días</th>
-                      <th style={{textAlign:'center'}}>KM total</th>
-                      <th style={{textAlign:'center'}}>KM prom/día</th>
-                      <th style={{textAlign:'center'}}>Litros</th>
-                      <th style={{textAlign:'center'}}>Costo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {gruposFiltrados.map(g=>(
-                      <tr key={g.chofer}>
-                        <td style={{fontWeight:500,color:'var(--text)'}}>{g.chofer||'—'}</td>
-                        <td>{g.vehiculo||'—'}</td>
-                        <td style={{textAlign:'center'}}>{g.diasTrabajados}</td>
-                        <td style={{textAlign:'center',fontWeight:700,color:'var(--purple)'}}>{g.kmTotal.toLocaleString('es-AR')}</td>
-                        <td style={{textAlign:'center'}}>{g.kmPromedio.toLocaleString('es-AR')}</td>
-                        <td style={{textAlign:'center'}}>{g.litrosTotal>0?`${g.litrosTotal.toLocaleString('es-AR')} L`:'—'}</td>
-                        <td style={{textAlign:'center'}}>{g.costoTotal>0?`$${g.costoTotal.toLocaleString('es-AR')}`:'—'}</td>
-                      </tr>
+              {mensualData.length>1&&(
+                <div style={{marginBottom:'1.25rem'}}>
+                  <label style={L}>Chofer</label>
+                  <select className="select" style={{maxWidth:320}}
+                    value={mensualChoferIdx}
+                    onChange={e=>setMensualChoferIdx(Number(e.target.value))}>
+                    {mensualData.map((c,i)=>(
+                      <option key={c.email} value={i}>{c.nombre}{c.vehiculo?` — ${c.vehiculo}`:''}</option>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </select>
+                </div>
+              )}
+              {mensualChoferActivo&&(
+                <ChoferCard chofer={mensualChoferActivo} fecha={mensualMes} empresa={nombreEmpresa} modo="mes"/>
+              )}
             </div>
           )}
         </div>
@@ -574,13 +538,17 @@ export default function ReportesKMPage() {
 /* ═══════════════════════════════════════════════════════════════════════════
    ChoferCard — vista detallada de un chofer en el resumen diario
    ═══════════════════════════════════════════════════════════════════════════ */
-function ChoferCard({chofer,fecha,empresa}:{chofer:ChoferR;fecha:string;empresa:string}) {
+function ChoferCard({chofer,fecha,empresa,modo='dia'}:{chofer:ChoferR;fecha:string;empresa:string;modo?:'dia'|'mes'}) {
   const $ar=(n:number)=>`$${n.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+  const esMes=modo==='mes';
   const [exportando,setExportando]=useState(false);
 
   const handleExport=async()=>{
     setExportando(true);
-    try{ exportarResumenPDF(chofer,fecha,empresa); }
+    try{
+      if(esMes) exportarResumenMensualPDF(chofer,fecha,empresa);
+      else exportarResumenPDF(chofer,fecha,empresa);
+    }
     catch(e){ console.error('[PDF]',e); }
     finally{ setExportando(false); }
   };
@@ -597,16 +565,22 @@ function ChoferCard({chofer,fecha,empresa}:{chofer:ChoferR;fecha:string;empresa:
             )}
           </div>
           <div style={{display:'flex',gap:'1.5rem',flexWrap:'wrap'}}>
+            {esMes&&chofer.diasActivos!==undefined&&(
+              <div style={{textAlign:'center'}}>
+                <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>Días activos</p>
+                <p style={{fontSize:'1.1rem',fontWeight:700,color:'var(--text2)'}}>{chofer.diasActivos}</p>
+              </div>
+            )}
             <div style={{textAlign:'center'}}>
-              <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>KM Inicial</p>
+              <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>{esMes?'KM ini (1er día)':'KM Inicial'}</p>
               <p style={{fontSize:'1.1rem',fontWeight:700,color:'var(--text2)'}}>{chofer.km.inicial.toLocaleString('es-AR')}</p>
             </div>
             <div style={{textAlign:'center'}}>
-              <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>KM Final</p>
+              <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>{esMes?'KM fin (últ. día)':'KM Final'}</p>
               <p style={{fontSize:'1.1rem',fontWeight:700,color:'var(--text2)'}}>{chofer.km.final.toLocaleString('es-AR')}</p>
             </div>
             <div style={{textAlign:'center'}}>
-              <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>Recorridos</p>
+              <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>{esMes?'KM del mes':'Recorridos'}</p>
               <p style={{fontSize:'1.25rem',fontWeight:800,color:'var(--purple)'}}>{chofer.km.recorridos.toLocaleString('es-AR')} km</p>
             </div>
             <div style={{textAlign:'center'}}>
@@ -638,6 +612,9 @@ function ChoferCard({chofer,fecha,empresa}:{chofer:ChoferR;fecha:string;empresa:
                 <div key={i} style={{padding:'.65rem .85rem',background:'var(--bg4)',borderRadius:'var(--radius)',border:'1px solid var(--border)'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'.5rem'}}>
                     <div style={{minWidth:0}}>
+                      {esMes&&e.fecha&&(
+                        <p style={{fontSize:'.7rem',color:'var(--text3)',marginBottom:'.15rem',fontWeight:600}}>{e.fecha}</p>
+                      )}
                       <p style={{fontSize:'.82rem',fontWeight:600,color:'var(--text)',marginBottom:'.1rem'}}>
                         {e.categoria||'Sin categoría'}
                       </p>
@@ -673,6 +650,9 @@ function ChoferCard({chofer,fecha,empresa}:{chofer:ChoferR;fecha:string;empresa:
                 <div key={i} style={{padding:'.65rem .85rem',background:'var(--bg4)',borderRadius:'var(--radius)',border:'1px solid var(--border)'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'.5rem'}}>
                     <div style={{minWidth:0}}>
+                      {esMes&&r.fecha&&(
+                        <p style={{fontSize:'.7rem',color:'var(--text3)',marginBottom:'.15rem',fontWeight:600}}>{r.fecha}</p>
+                      )}
                       {r.nroRemito&&<p style={{fontSize:'.75rem',color:'var(--text3)',marginBottom:'.1rem'}}>N° {r.nroRemito}</p>}
                       <p style={{fontSize:'.82rem',fontWeight:600,color:'var(--text)',marginBottom:'.1rem'}}>
                         {r.razonSocial||'Sin proveedor'}
@@ -709,19 +689,28 @@ function ChoferCard({chofer,fecha,empresa}:{chofer:ChoferR;fecha:string;empresa:
       {/* Chicos / Beneficiarios */}
       <div className="card" style={{padding:'1.25rem'}}>
         <p style={{fontSize:'.75rem',fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:'.85rem'}}>
-          👥 Beneficiarios del día
+          👥 {esMes?'Beneficiarios del mes':'Beneficiarios del día'}
           {chofer.chicos.length>0&&(
             <span style={{marginLeft:'.5rem',color:'var(--blue-bright)',fontWeight:600}}>{chofer.chicos.length}</span>
           )}
         </p>
         {chofer.chicos.length===0?(
-          <p style={{fontSize:'.83rem',color:'var(--text3)',fontStyle:'italic'}}>Sin asistencia asignada para esta fecha</p>
+          <p style={{fontSize:'.83rem',color:'var(--text3)',fontStyle:'italic'}}>
+            {esMes?'Sin asistencia en el mes':'Sin asistencia asignada para esta fecha'}
+          </p>
         ):(
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'.5rem'}}>
             {chofer.chicos.map((b,i)=>(
               <div key={i} style={{padding:'.55rem .75rem',background:'var(--bg4)',borderRadius:'var(--radius)',border:'1px solid var(--border)'}}>
-                <p style={{fontSize:'.83rem',fontWeight:600,color:'var(--text)'}}>{b.nombre}</p>
-                {b.domicilio&&<p style={{fontSize:'.73rem',color:'var(--text3)',marginTop:'.1rem'}}>{b.domicilio}</p>}
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'.4rem'}}>
+                  <div style={{minWidth:0}}>
+                    <p style={{fontSize:'.83rem',fontWeight:600,color:'var(--text)'}}>{b.nombre}</p>
+                    {b.domicilio&&<p style={{fontSize:'.73rem',color:'var(--text3)',marginTop:'.1rem'}}>{b.domicilio}</p>}
+                  </div>
+                  {esMes&&b.diasTransportado!==undefined&&(
+                    <span className="badge badge-blue" style={{fontSize:'.68rem',flexShrink:0}}>{b.diasTransportado}d</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
