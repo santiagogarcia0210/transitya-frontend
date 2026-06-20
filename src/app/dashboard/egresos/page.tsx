@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 import Button from '@/components/ui/Button';
+import { exportarEgresosMensualPDF } from '@/lib/pdfResumen';
 
 type TabEgr = 'carga' | 'buscar' | 'stats';
 
@@ -92,7 +93,12 @@ export default function EgresosPage() {
   const [statsMes,       setStatsMes]       = useState(() => new Date().getMonth());
   const [statsAnio,      setStatsAnio]      = useState(() => new Date().getFullYear());
 
+  /* ── Export PDF mensual ── */
   const hoy = new Date();
+  const hoyMesISO = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
+  const [pdfMes,         setPdfMes]         = useState(hoyMesISO);
+  const [exportandoPDF,  setExportandoPDF]  = useState(false);
+  const [nombreEmpresa,  setNombreEmpresa]  = useState('Transit·Ya');
 
   const cargar = async () => {
     setLoading(true);
@@ -103,7 +109,13 @@ export default function EgresosPage() {
     setLoading(false);
   };
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => {
+    cargar();
+    api.get('/api/empresa').then(r => {
+      const n = String(r.data?.nombre || r.data?.razonSocial || r.data?.empresa || '');
+      if (n) setNombreEmpresa(n);
+    }).catch(() => {});
+  }, []);
 
   const choferes = Array.from(
     new Map(
@@ -232,6 +244,37 @@ export default function EgresosPage() {
   const CATEG_COLORS: Record<string, string> = {
     Combustible: 'var(--amber)', Repuesto: 'var(--blue)', Mantenimiento: 'var(--purple)',
     Seguro: 'var(--teal)', Peaje: 'var(--green)', Limpieza: 'var(--blue)', Otro: 'var(--text3)',
+  };
+
+  const exportarMes = () => {
+    if (!pdfMes) return;
+    const [anio, mes] = pdfMes.split('-').map(Number);
+    const enMes = (fecha: string) => {
+      const f = fecha.trim();
+      const pDMY = f.match(/^(\d{1,2})\/(\d{2})\/(\d{4})$/);
+      if (pDMY) return Number(pDMY[3]) === anio && Number(pDMY[2]) === mes;
+      const pISO = f.match(/^(\d{4})-(\d{2})/);
+      if (pISO) return Number(pISO[1]) === anio && Number(pISO[2]) === mes;
+      return false;
+    };
+    const toISO = (f: string) => {
+      const p = f.match(/^(\d{1,2})\/(\d{2})\/(\d{4})$/);
+      return p ? `${p[3]}-${p[2]}-${p[1].padStart(2,'0')}` : f;
+    };
+    const delMes = lista.filter(e => e.fecha && enMes(e.fecha));
+    const ordenados = [...delMes].sort((a, b) => toISO(a.fecha).localeCompare(toISO(b.fecha)));
+    setExportandoPDF(true);
+    try {
+      exportarEgresosMensualPDF(
+        ordenados.map(e => ({
+          fecha: e.fecha, chofer: e.chofer, categoria: e.categoria,
+          proveedor: e.proveedor, concepto: e.concepto, monto: e.monto,
+        })),
+        pdfMes,
+        nombreEmpresa,
+      );
+    } catch (err) { console.error('[PDF Egresos]', err); }
+    setExportandoPDF(false);
   };
 
   return (
@@ -412,10 +455,20 @@ export default function EgresosPage() {
             </div>
           ) : (
             <>
-              <p style={{ fontSize:'.8rem', color:'var(--text3)', margin:'.5rem 0' }}>
-                {filtrados.length} registro{filtrados.length!==1?'s':''} ·{' '}
-                <strong style={{ color:'var(--red)' }}>{fmt(total)}</strong>
-              </p>
+              <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', justifyContent:'space-between', gap:'.5rem', margin:'.5rem 0' }}>
+                <p style={{ fontSize:'.8rem', color:'var(--text3)' }}>
+                  {filtrados.length} registro{filtrados.length!==1?'s':''} ·{' '}
+                  <strong style={{ color:'var(--red)' }}>{fmt(total)}</strong>
+                </p>
+                <div style={{ display:'flex', alignItems:'center', gap:'.5rem' }}>
+                  <input type="month" className="input" style={{ width:152, fontSize:'.8rem', padding:'.3rem .55rem' }}
+                    value={pdfMes} onChange={e => setPdfMes(e.target.value)} />
+                  <button className="btn btn-secondary" style={{ fontSize:'.78rem', padding:'.35rem .75rem', whiteSpace:'nowrap' }}
+                    onClick={exportarMes} disabled={exportandoPDF || loading}>
+                    {exportandoPDF ? '…' : '📄 Exportar mes (PDF)'}
+                  </button>
+                </div>
+              </div>
 
               {filtrados.length === 0 ? (
                 <div className="empty-state"><div className="empty-icon">💸</div><p>Sin egresos encontrados.</p></div>

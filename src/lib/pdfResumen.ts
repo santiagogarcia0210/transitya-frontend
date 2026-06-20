@@ -28,6 +28,11 @@ export interface ChoferR {
   egresos:EgresoR[]; remitos:RemitoR[]; chicos:ChicoR[];
 }
 
+/* ── Tipo para export de egresos consolidado ─────────────────────────────── */
+export interface EgresoExport {
+  fecha:string; chofer:string; categoria:string; proveedor:string; concepto:string; monto:number;
+}
+
 /* ── Helpers de formato ──────────────────────────────────────────────────── */
 const $ar  = (n:number) => `$${n.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0})}`;
 const safe = (s:string) => s.replace(/[^a-zA-Z0-9_-]/g,'_');
@@ -350,4 +355,61 @@ export function exportarResumenMensualPDF(chofer:ChoferR, mesISO:string, empresa
 
   addFooters(doc, W, empresa);
   doc.save(`resumen_mensual_${safe(chofer.nombre)}_${mesISO}.pdf`);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   exportarEgresosMensualPDF — todos los choferes, cronológico
+   ════════════════════════════════════════════════════════════════════════════ */
+export function exportarEgresosMensualPDF(
+  egresos: EgresoExport[],
+  mesISO: string,
+  empresa = 'Transit·Ya',
+) {
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' }) as JsPDFAT;
+  const W   = doc.internal.pageSize.getWidth();
+
+  let y = buildHeader(doc, W, empresa, 'EGRESOS', mesLabel(mesISO));
+
+  /* Línea resumen */
+  const totalMonto = egresos.reduce((s, e) => s + e.monto, 0);
+  doc.setFontSize(9);
+  doc.setFont('helvetica','normal');
+  tColor(doc, GRAY_LB);
+  doc.text(`Total de registros: ${egresos.length}`, 14, y);
+  tColor(doc, BLACK);
+  doc.setFont('helvetica','bold');
+  doc.text($ar(totalMonto), W - 14, y, { align:'right' });
+  doc.setFont('helvetica','normal');
+  y += 9;
+
+  if (egresos.length === 0) {
+    emptyRow(doc, 'Sin egresos para el período seleccionado', y, W);
+  } else {
+    autoTable(doc, {
+      startY: y,
+      margin: { left:14, right:14 },
+      head: [['Fecha','Chofer','Categoría','Proveedor','Concepto','Monto']],
+      body: egresos.map(e => [
+        e.fecha||'—', e.chofer||'—', e.categoria||'—',
+        e.proveedor||'—', e.concepto||'—', $ar(e.monto),
+      ]),
+      foot: [[
+        { content:'TOTAL', colSpan:5,
+          styles:{ halign:'right' as const, fontStyle:'bold' as const, fillColor:GRAY_TOT, textColor:GRAY_LB } },
+        { content:$ar(totalMonto),
+          styles:{ fontStyle:'bold' as const, fillColor:GRAY_TOT, textColor:BLACK } },
+      ]],
+      styles: tStyles(),
+      headStyles: hStyles(),
+      alternateRowStyles: { fillColor:GRAY_BG },
+      columnStyles: {
+        0:{ cellWidth:22 },
+        5:{ halign:'right' as const },
+      },
+      showFoot: 'lastPage',
+    });
+  }
+
+  addFooters(doc, W, empresa);
+  doc.save(`egresos_${mesISO}.pdf`);
 }
