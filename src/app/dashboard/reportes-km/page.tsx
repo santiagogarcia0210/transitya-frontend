@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import { exportarResumenPDF } from '@/lib/pdfResumen';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -82,14 +83,20 @@ export default function ReportesKMPage() {
 
   /* Perfil */
   const [esAdmin,    setEsAdmin]    = useState(false);
-  const [miNombre,   setMiNombre]   = useState('');
-  const [miVehiculo, setMiVehiculo] = useState('');
+  const [miNombre,     setMiNombre]     = useState('');
+  const [miVehiculo,   setMiVehiculo]   = useState('');
+  const [nombreEmpresa,setNombreEmpresa]= useState('Transit·Ya');
   useEffect(()=>{
     api.get('/api/usuarios/perfil').then(r=>{
       const d=serializarFirestore(r.data);
       setEsAdmin(String(d.rol||'').toLowerCase()==='admin');
       setMiNombre(String(d.nombre||d.usuario||''));
       setMiVehiculo(String(d.vehiculo||''));
+    }).catch(()=>{});
+    api.get('/api/empresa').then(r=>{
+      const d=r.data;
+      const n=String(d?.nombre||d?.razonSocial||d?.empresa||'');
+      if(n)setNombreEmpresa(n);
     }).catch(()=>{});
   },[]);
 
@@ -487,7 +494,7 @@ export default function ReportesKMPage() {
                 </div>
               )}
 
-              {choferActivo&&<ChoferCard chofer={choferActivo}/>}
+              {choferActivo&&<ChoferCard chofer={choferActivo} fecha={resumenFecha} empresa={nombreEmpresa}/>}
             </div>
           )}
         </div>
@@ -567,8 +574,16 @@ export default function ReportesKMPage() {
 /* ═══════════════════════════════════════════════════════════════════════════
    ChoferCard — vista detallada de un chofer en el resumen diario
    ═══════════════════════════════════════════════════════════════════════════ */
-function ChoferCard({chofer}:{chofer:ChoferR}) {
+function ChoferCard({chofer,fecha,empresa}:{chofer:ChoferR;fecha:string;empresa:string}) {
   const $ar=(n:number)=>`$${n.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+  const [exportando,setExportando]=useState(false);
+
+  const handleExport=async()=>{
+    setExportando(true);
+    try{ exportarResumenPDF(chofer,fecha,empresa); }
+    catch(e){ console.error('[PDF]',e); }
+    finally{ setExportando(false); }
+  };
 
   return (
     <div>
@@ -598,6 +613,11 @@ function ChoferCard({chofer}:{chofer:ChoferR}) {
               <p style={{fontSize:'.68rem',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.07em',fontWeight:700}}>Monto total</p>
               <p style={{fontSize:'1.25rem',fontWeight:800,color:'var(--green)'}}>{$ar(chofer.montoTotal)}</p>
             </div>
+            <button className="btn btn-secondary" onClick={handleExport} disabled={exportando}
+              style={{fontSize:'.78rem',padding:'.4rem .8rem',alignSelf:'center',flexShrink:0}}
+              title="Exportar PDF de este chofer">
+              {exportando?<><span className="spinner" style={{width:11,height:11}}/>Generando…</>:'📄 Exportar PDF'}
+            </button>
           </div>
         </div>
       </div>
