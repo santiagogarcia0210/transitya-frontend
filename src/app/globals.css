@@ -710,7 +710,7 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
     box-shadow: 4px 0 28px rgba(0,0,0,.35);
   }
   /* Shift main content to leave room for collapsed sidebar */
-  .dashboard-main { margin-left: 68px; }
+  .dashboard-main { margin-left: 68px; padding: 1.75rem 2rem; }
 }
 
 /* ── Logo area ────────────────────────────────────────────────────────── */
@@ -866,10 +866,15 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
   /* Hide sidebar on mobile */
   .dashboard-sidebar { display: none !important; }
 
-  /* Add bottom padding so content isn't hidden behind nav; reduce horizontal padding */
-  .dashboard-main { padding-bottom: 100px !important; padding-left: 1rem !important; padding-right: 1rem !important; }
+  /* Reemplaza todo el padding en mobile: top normal, lados reducidos, bottom con espacio para la barra */
+  .dashboard-main { padding: 1.75rem 1rem 140px !important; }
 
-  /* Show bottom nav */
+  /* Cards con scroll interno (maxHeight + overflowY): el bnav fijo (~104px desde el fondo)
+     tapaba el botón Guardar. padding-bottom funciona en block containers (no flex-column). */
+  .dashboard-main .card[style*="overflow-y"] { padding-bottom: 140px !important; }
+
+  /* Show bottom nav — z-index 40 keeps it above page content (z-index:1)
+     but below modals (z-index:50) so overlays always float on top */
   .bnav {
     display: flex;
     flex-direction: column;
@@ -883,7 +888,7 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
     border: 1px solid var(--border2);
     border-radius: var(--radius-xl);
     padding: 10px 0 8px;
-    z-index: 100;
+    z-index: 40;
     box-shadow: 0 8px 32px rgba(0,0,0,.45), 0 0 0 1px rgba(108,95,255,.12);
     backdrop-filter: blur(12px);
   }
