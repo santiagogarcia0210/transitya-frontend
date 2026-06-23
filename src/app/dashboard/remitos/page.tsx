@@ -516,6 +516,7 @@ export default function RemitosPage() {
                 {saving && 'Guardando…'}
               </Button>
             </div>
+            {previewUrl && <div style={{ height: 100 }} aria-hidden="true" />}
           </div>
         </div>
       )}

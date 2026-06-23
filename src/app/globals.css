@@ -873,8 +873,9 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
      tapaba el botón Guardar. padding-bottom funciona en block containers (no flex-column). */
   .dashboard-main .card[style*="overflow-y"] { padding-bottom: 140px !important; }
 
-  /* Show bottom nav — z-index 40 keeps it above page content (z-index:1)
-     but below modals (z-index:50) so overlays always float on top */
+  /* Show bottom nav — z-index 40 keeps it above page content
+     but below modals (z-index:50) — dashboard-main has no z-index so fixed
+     children (modals) participate in root context and win at z-index:50 */
   .bnav {
     display: flex;
     flex-direction: column;

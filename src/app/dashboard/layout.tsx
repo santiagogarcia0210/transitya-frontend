@@ -31,7 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="dashboard-layout" style={{ minHeight: '100vh', background: 'var(--bg)', position: 'relative' }}>
       <FlowFieldBackground intensity="subtle" />
       <Sidebar />
-      <main className="dashboard-main" style={{ position: 'relative', zIndex: 1, padding: '1.75rem 2rem', overflowY: 'auto', minHeight: '100vh' }}>
+      <main className="dashboard-main" style={{ position: 'relative', overflowY: 'auto', minHeight: '100vh' }}>
         {children}
       </main>
       <BottomNav />
