@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
+import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -230,6 +231,7 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
 /* ═══════════════════════════════════════════════════════════════════════ */
 
 export default function PlanillaIncluirPage() {
+  const authLoading = useRequireAdmin();
   const router = useRouter();
   const { tipo, loading: tipoLoading } = useEmpresaTipo();
 
@@ -280,6 +282,7 @@ export default function PlanillaIncluirPage() {
     setMes(m); setAnio(a);
   }
 
+  if (authLoading) return null;
   if (tipoLoading) return <div style={{ padding:'2rem', color:'var(--text3)' }}><span className="spinner"/> Verificando…</div>;
   if (tipo !== 'transporte_escolar' && tipo !== 'transporte_especial') return null;
 

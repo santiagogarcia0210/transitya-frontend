@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 
 type Tab = 'comprobantes' | 'arca';
 
@@ -75,6 +76,7 @@ const EMPTY_ARCA:FormARCA={id:'',tipoComprobante:'Factura B',puntoVenta:'',numer
 /* ═══════════════════════════════════════════════════════════════════════ */
 
 export default function FacturacionPage() {
+  const authLoading = useRequireAdmin();
   const hoy=new Date(); const anioAct=hoy.getFullYear();
   const [tab, setTab] = useState<Tab>('comprobantes');
 
@@ -132,9 +134,33 @@ export default function FacturacionPage() {
   const [filtHasta, setFiltHasta] = useState('');
   const [modalA,    setModalA]    = useState(false);
   const [formA,     setFormA]     = useState<FormARCA>(EMPTY_ARCA);
-  const [savingA,   setSavingA]   = useState(false);
-  const [pagandoId, setPagandoId] = useState<string|null>(null);
-  const [msgA,      setMsgA]      = useState<{text:string;ok:boolean}|null>(null);
+  const [savingA,      setSavingA]      = useState(false);
+  const [pagandoId,    setPagandoId]    = useState<string|null>(null);
+  const [msgA,         setMsgA]         = useState<{text:string;ok:boolean}|null>(null);
+  const [padronLoading,setPadronLoading]= useState(false);
+  const [padronInfo,   setPadronInfo]   = useState<{condicionIvaLabel:string;domicilio:string}|null>(null);
+  const [padronErr,    setPadronErr]    = useState<string|null>(null);
+
+  const buscarPadron=async()=>{
+    const cuit=formA.cuitCliente.replace(/\D/g,'');
+    if(cuit.length!==11){setPadronErr('CUIT debe tener 11 dígitos.');return;}
+    setPadronLoading(true);setPadronErr(null);setPadronInfo(null);
+    try{
+      const r=await api.get(`/api/arca/padron/${cuit}`);
+      const d=r.data;
+      // Rellenar razón social y sugerir tipo de comprobante
+      setFormA(prev=>({
+        ...prev,
+        cliente: d.razonSocial||prev.cliente,
+        tipoComprobante: d.condicionIva==='responsable_inscripto'?'Factura A':'Factura B',
+      }));
+      setPadronInfo({condicionIvaLabel:d.condicionIvaLabel,domicilio:d.domicilio||''});
+    }catch(e:unknown){
+      const msg=e instanceof Error?e.message:'Error al consultar padrón';
+      setPadronErr(String((e as {response?:{data?:{mensaje?:string}}})?.response?.data?.mensaje||msg));
+    }
+    setPadronLoading(false);
+  };
 
   const cargarArca=useCallback(async()=>{
     setLoadingA(true);
@@ -153,8 +179,8 @@ export default function FacturacionPage() {
   const totCobrado=arcaFiltrada.filter(f=>f.estado==='cobrada').reduce((s,f)=>s+f.monto,0);
   const totPendA  =arcaFiltrada.filter(f=>f.estado==='emitida').reduce((s,f)=>s+f.monto,0);
   const sfA=(k:keyof FormARCA)=>(ev:React.ChangeEvent<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>)=>setFormA(f=>({...f,[k]:ev.target.value}));
-  const abrirA=(f?:FacturaARCA)=>{setFormA(f?{id:f.id,tipoComprobante:f.tipoComprobante,puntoVenta:f.puntoVenta,numero:f.numero,cae:f.cae,fecha:f.fecha,cliente:f.cliente,cuitCliente:f.cuitCliente,concepto:f.concepto,monto:String(f.monto)}:EMPTY_ARCA);setMsgA(null);setModalA(true);};
-  const cerrarA=()=>{setModalA(false);setMsgA(null);};
+  const abrirA=(f?:FacturaARCA)=>{setFormA(f?{id:f.id,tipoComprobante:f.tipoComprobante,puntoVenta:f.puntoVenta,numero:f.numero,cae:f.cae,fecha:f.fecha,cliente:f.cliente,cuitCliente:f.cuitCliente,concepto:f.concepto,monto:String(f.monto)}:EMPTY_ARCA);setMsgA(null);setPadronInfo(null);setPadronErr(null);setModalA(true);};
+  const cerrarA=()=>{setModalA(false);setMsgA(null);setPadronInfo(null);setPadronErr(null);};
   const guardarA=async()=>{
     if(!formA.fecha||!formA.cliente||!formA.monto){setMsgA({text:'Completá fecha, cliente y monto',ok:false});return;}
     setSavingA(true);setMsgA(null);
@@ -167,6 +193,8 @@ export default function FacturacionPage() {
     try{await api.patch(`/api/facturacion/arca/${id}/pagar`);cargarArca();}catch{/*silent*/}
     setPagandoId(null);
   };
+
+  if (authLoading) return null;
 
   /* ─── Render ──────────────────────────────────────────────────────── */
   return (
@@ -393,10 +421,28 @@ export default function FacturacionPage() {
                     <div><label style={L}>Fecha *</label><input type="date" className="input" value={formA.fecha} onChange={sfA('fecha')}/></div>
                     <div><label style={L}>CAE</label><input className="input" placeholder="12345678901234" value={formA.cae} onChange={sfA('cae')}/></div>
                   </div>
-                  <div className="form-grid form-grid-2">
-                    <div><label style={L}>Cliente *</label><input className="input" placeholder="Razón social" value={formA.cliente} onChange={sfA('cliente')}/></div>
-                    <div><label style={L}>CUIT cliente</label><input className="input" placeholder="30-12345678-9" value={formA.cuitCliente} onChange={sfA('cuitCliente')}/></div>
+                  <div>
+                    <label style={L}>CUIT cliente</label>
+                    <div style={{display:'flex',gap:'.4rem',alignItems:'center'}}>
+                      <input className="input" placeholder="30-12345678-9"
+                        value={formA.cuitCliente} onChange={e=>{sfA('cuitCliente')(e);setPadronInfo(null);setPadronErr(null);}}
+                        onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();buscarPadron();}}}
+                        style={{flex:1}}/>
+                      <button type="button" className="btn btn-secondary"
+                        style={{whiteSpace:'nowrap',fontSize:'.78rem',padding:'.45rem .75rem'}}
+                        onClick={buscarPadron} disabled={padronLoading}>
+                        {padronLoading?<span className="spinner" style={{width:11,height:11}}/>:'🔍 Buscar'}
+                      </button>
+                    </div>
+                    {padronErr&&<p style={{fontSize:'.75rem',color:'var(--red)',marginTop:'.25rem'}}>{padronErr}</p>}
+                    {padronInfo&&(
+                      <div style={{fontSize:'.75rem',color:'var(--text3)',marginTop:'.3rem',display:'flex',gap:'.5rem',flexWrap:'wrap',alignItems:'center'}}>
+                        <span className="badge badge-blue" style={{fontSize:'.72rem'}}>{padronInfo.condicionIvaLabel}</span>
+                        {padronInfo.domicilio&&<span>{padronInfo.domicilio}</span>}
+                      </div>
+                    )}
                   </div>
+                  <div><label style={L}>Cliente *</label><input className="input" placeholder="Razón social" value={formA.cliente} onChange={sfA('cliente')}/></div>
                   <div className="form-grid form-grid-2">
                     <div><label style={L}>Monto *</label><input type="number" className="input" placeholder="0" value={formA.monto} onChange={sfA('monto')}/></div>
                     <div><label style={L}>Concepto</label><input className="input" placeholder="Descripción" value={formA.concepto} onChange={sfA('concepto')}/></div>

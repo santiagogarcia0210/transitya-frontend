@@ -23,7 +23,7 @@ export function useUserRol() {
       if (!user) { setRol(''); setLoading(false); return; }
       try {
         const result = await user.getIdTokenResult();
-        const r = String(result.claims.rol || '');
+        const r = String(result.claims.rol || '').toLowerCase();
         _cached = r;
         setRol(r);
       } catch {

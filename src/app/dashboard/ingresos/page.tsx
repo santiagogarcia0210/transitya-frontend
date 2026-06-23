@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 import Button from '@/components/ui/Button';
+import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 
 type TabIng = 'carga' | 'buscar' | 'stats';
 
@@ -51,6 +52,7 @@ const formatFecha = (f: string) => {
 };
 
 export default function IngresosPage() {
+  const authLoading = useRequireAdmin();
   const [tab,          setTab]          = useState<TabIng>('carga');
   const [lista,        setLista]        = useState<Ingreso[]>([]);
   const [loading,      setLoading]      = useState(true);
@@ -165,6 +167,8 @@ export default function IngresosPage() {
     })).sort((a,b) => b.total - a.total);
 
   const maxOS = Math.max(...porObraSocial.map(o => o.total), 1);
+
+  if (authLoading) return null;
 
   return (
     <div>

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
+import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio',
                   'julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -131,6 +132,7 @@ function CartaCambio({ c, onPrint }: { c: Carta; onPrint: (idx: number) => void 
 /* ═══════════════════════════════════════════════════════════════════════ */
 
 export default function CambioTransportePage() {
+  const authLoading = useRequireAdmin();
   const router = useRouter();
   const { tipo, loading: tipoLoading } = useEmpresaTipo();
 
@@ -178,6 +180,7 @@ export default function CambioTransportePage() {
     win.close();
   };
 
+  if (authLoading) return null;
   if (tipoLoading) return <div style={{ padding:'2rem', color:'var(--text3)' }}><span className="spinner"/> Verificando…</div>;
   if (tipo !== 'transporte_escolar' && tipo !== 'transporte_especial') return null;
 

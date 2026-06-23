@@ -1,6 +1,6 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   IconHome,
   IconClipboardList,
@@ -16,11 +16,16 @@ import {
   IconChartBar,
   IconCalendarStats,
   IconSettings,
+  IconMapPin,
 } from '@tabler/icons-react';
 import type { Icon } from '@tabler/icons-react';
+import { CHOFER_HREFS } from '@/lib/navAccess';
+import { useUserRol } from '@/hooks/useUserRol';
 
 type NavItem = { href: string; label: string; Icon: Icon };
 
+// Lista completa de ítems del nav (admin ve todos; chofer ve solo los de CHOFER_HREFS).
+// mi-ruta está aquí aunque no aparezca para admin — CHOFER_HREFS lo incluye.
 const ITEMS: NavItem[] = [
   { href: '/dashboard',                    label: 'Inicio',          Icon: IconHome },
   { href: '/dashboard/planilla-incluir',   label: 'Planilla',        Icon: IconClipboardList },
@@ -36,23 +41,36 @@ const ITEMS: NavItem[] = [
   { href: '/dashboard/reportes-km',        label: 'Reportes KM',     Icon: IconChartBar },
   { href: '/dashboard/vencimientos',       label: 'Vencimientos',    Icon: IconCalendarStats },
   { href: '/dashboard/administrador',      label: 'Administrador',   Icon: IconSettings },
+  { href: '/dashboard/mi-ruta',            label: 'Mi ruta',         Icon: IconMapPin },
 ];
 
 const SLIDE_SIZE = 3;
-const SLIDES: NavItem[][] = Array.from(
-  { length: Math.ceil(ITEMS.length / SLIDE_SIZE) },
-  (_, i) => ITEMS.slice(i * SLIDE_SIZE, (i + 1) * SLIDE_SIZE)
-);
 
 export default function BottomNav() {
   const pathname  = usePathname();
   const router    = useRouter();
   const trackRef  = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState(0);
+  const { rol } = useUserRol();
+
+  // Filtrar por rol: chofer ve solo sus rutas (CHOFER_HREFS), admin ve todo excepto mi-ruta
+  const itemsVisibles = useMemo(() =>
+    rol === 'chofer'
+      ? ITEMS.filter(i => CHOFER_HREFS.has(i.href))
+      : ITEMS.filter(i => i.href !== '/dashboard/mi-ruta'),
+  [rol]);
+
+  // SLIDES se computa dentro del componente porque depende del rol
+  const slides = useMemo(() =>
+    Array.from(
+      { length: Math.ceil(itemsVisibles.length / SLIDE_SIZE) },
+      (_, i) => itemsVisibles.slice(i * SLIDE_SIZE, (i + 1) * SLIDE_SIZE)
+    ),
+  [itemsVisibles]);
 
   /* Scroll to the slide that contains the active item on mount / route change */
   useEffect(() => {
-    const activeIdx = ITEMS.findIndex(item => pathname === item.href);
+    const activeIdx = itemsVisibles.findIndex(item => pathname === item.href);
     const slide = activeIdx >= 0 ? Math.floor(activeIdx / SLIDE_SIZE) : 0;
     setCurrent(slide);
     const track = trackRef.current;
@@ -60,7 +78,7 @@ export default function BottomNav() {
     requestAnimationFrame(() => {
       track.scrollLeft = slide * track.clientWidth;
     });
-  }, [pathname]);
+  }, [pathname, itemsVisibles]);
 
   const handleScroll = useCallback(() => {
     const track = trackRef.current;
@@ -84,7 +102,7 @@ export default function BottomNav() {
         className="bnav-track"
         onScroll={handleScroll}
       >
-        {SLIDES.map((slide, si) => (
+        {slides.map((slide, si) => (
           <div key={si} className="bnav-slide">
             {slide.map(item => {
               const active = pathname === item.href;
@@ -107,12 +125,12 @@ export default function BottomNav() {
 
       {/* Dot indicators */}
       <div className="bnav-dots" role="tablist" aria-label="Diapositivas">
-        {SLIDES.map((_, i) => (
+        {slides.map((_, i) => (
           <button
             key={i}
             role="tab"
             aria-selected={i === current}
-            aria-label={`Slide ${i + 1} de ${SLIDES.length}`}
+            aria-label={`Slide ${i + 1} de ${slides.length}`}
             className={`bnav-dot${i === current ? ' bnav-dot-active' : ''}`}
             onClick={() => goToSlide(i)}
           />

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
+import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 
 function getField(reg: Record<string,unknown>, ...claves: string[]): string {
   const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
@@ -207,6 +208,7 @@ const EMPTY: FormState = { id:'', tipo:'Alta', beneficiario:'', fecha:'', organi
 /* ═══════════════════════════════════════════════════════════════════════ */
 
 export default function PresentacionDocsPage() {
+  const authLoading = useRequireAdmin();
   const router = useRouter();
   const { tipo: empresaTipo, loading: tipoLoading } = useEmpresaTipo();
 
@@ -276,6 +278,7 @@ export default function PresentacionDocsPage() {
     catch { /* silent */ }
   };
 
+  if (authLoading) return null;
   if (tipoLoading) return <div style={{ padding:'2rem', color:'var(--text3)' }}><span className="spinner"/> Verificando…</div>;
   if (empresaTipo !== 'transporte_escolar' && empresaTipo !== 'transporte_especial') return null;
 

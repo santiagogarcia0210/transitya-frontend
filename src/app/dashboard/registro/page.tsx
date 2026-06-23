@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 
 type Tab = 'alta' | 'baja' | 'ver' | 'fs';
 const DIAS_SEM = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
@@ -122,6 +123,7 @@ const L: React.CSSProperties = {
 };
 
 export default function RegistroPage() {
+  const authLoading = useRequireAdmin();
   const [tab,     setTab]     = useState<Tab>('alta');
   const [lista,   setLista]   = useState<Beneficiario[]>([]);
   const [loading, setLoading] = useState(true);
@@ -413,6 +415,8 @@ export default function RegistroPage() {
       </div>
     </div>
   );
+
+  if (authLoading) return null;
 
   /* ── Render ── */
   return (

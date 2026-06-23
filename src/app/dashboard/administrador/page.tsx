@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { getAuth } from 'firebase/auth';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 import WizardArca from '@/components/WizardArca';
 
 /* ─── Tipos ─────────────────────────────────────────────────────────── */
@@ -80,6 +81,7 @@ const BADGE_ROL: Record<string, string> = {
 /* ─── Componente ─────────────────────────────────────────────────────── */
 
 export default function AdministradorPage() {
+  const authLoading = useRequireAdmin();
   const [tab,           setTab]           = useState<Tab>('usuarios');
 
   /* — Usuarios — */
@@ -286,6 +288,8 @@ export default function AdministradorPage() {
     } catch { setMsgF({ text: 'Error al guardar', ok: false }); }
     setSavingF(false);
   };
+
+  if (authLoading) return null;
 
   /* ─── Render ──────────────────────────────────────────────────────── */
   return (

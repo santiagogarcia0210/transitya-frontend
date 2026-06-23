@@ -8,6 +8,7 @@ import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
 import { useUserRol } from '@/hooks/useUserRol';
+import { CHOFER_HREFS } from '@/lib/navAccess';
 import MiEmpresaModal from '@/components/MiEmpresaModal';
 import {
   IconHome, IconUsers, IconUser, IconClipboardList, IconClipboardCheck,
@@ -45,14 +46,11 @@ const ESCOLAR_EXTRAS: LinkItem[] = [
   { href: '/dashboard/facturacion',        label: 'Facturación',        icon: IconCreditCard },
 ];
 
-const CHOFER_LINKS: LinkItem[] = [
-  { href: '/dashboard',              label: 'Inicio',      icon: IconHome },
-  { href: '/dashboard/asistencia',   label: 'Asistencia',  icon: IconClipboardList },
-  { href: '/dashboard/mi-ruta',      label: 'Mi ruta',     icon: IconMapPin },
-  { href: '/dashboard/egresos',      label: 'Egresos',     icon: IconTrendingDown },
-  { href: '/dashboard/remitos',      label: 'Remitos',     icon: IconReceipt },
-  { href: '/dashboard/reportes-km',  label: 'Reportes KM', icon: IconChartBar },
-  { href: '/dashboard/vencimientos', label: 'Vencimientos',icon: IconCalendarStats },
+// Pool completo para el chofer: UNIVERSAL + mi-ruta (no está en ninguna lista admin).
+// Filtrado por CHOFER_HREFS (navAccess.ts) — no editar la lista de acceso aquí.
+const ALL_SIDEBAR_ITEMS: LinkItem[] = [
+  ...UNIVERSAL,
+  { href: '/dashboard/mi-ruta', label: 'Mi ruta', icon: IconMapPin },
 ];
 
 const TYPE_EXTRAS: Record<string, LinkItem[]> = {
@@ -88,7 +86,7 @@ export default function Sidebar() {
   const esChofer = rol === 'chofer';
 
   const links = useMemo<LinkItem[]>(() => {
-    if (esChofer) return CHOFER_LINKS;
+    if (esChofer) return ALL_SIDEBAR_ITEMS.filter(l => CHOFER_HREFS.has(l.href));
     const extras: LinkItem[] = (tipo ? TYPE_EXTRAS[tipo] : undefined) ?? [];
     return [UNIVERSAL[0], ...extras, ...UNIVERSAL.slice(1)];
   }, [tipo, esChofer]);
