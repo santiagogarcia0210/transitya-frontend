@@ -874,9 +874,7 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
   .dashboard-main .card[style*="overflow-y"] { padding-bottom: 140px !important; }
 
   /* Show bottom nav — z-index 40 keeps it above page content (z-index:1)
-     but below modals (z-index:50) so overlays always float on top.
-     pointer-events:none en el container permite que taps sobre zonas vacías del bnav
-     lleguen al contenido de abajo (botón Guardar). Los botones internos restauran auto. */
+     but below modals (z-index:50) so overlays always float on top */
   .bnav {
     display: flex;
     flex-direction: column;
@@ -893,10 +891,7 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
     z-index: 40;
     box-shadow: 0 8px 32px rgba(0,0,0,.45), 0 0 0 1px rgba(108,95,255,.12);
     backdrop-filter: blur(12px);
-    pointer-events: none;
   }
-  .bnav-btn,
-  .bnav-dot { pointer-events: auto; }
 }
 
 /* ── Scrollable track ─────────────────────────────────────────────── */
