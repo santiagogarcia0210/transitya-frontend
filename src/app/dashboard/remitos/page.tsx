@@ -207,12 +207,10 @@ export default function RemitosPage() {
     }
     setSaving(true); setMsg(null);
     try {
-      let payload: FormData | Record<string, string>;
+      let payload: Record<string, string>;
       if (archivo) {
-        const fd = new FormData();
-        (Object.entries(form) as [string, string][]).forEach(([k, v]) => fd.append(k, v));
-        fd.append('comprobante', archivo);
-        payload = fd;
+        const dataUrl = await toBase64(archivo);
+        payload = { ...form, comprobante: dataUrl };
       } else {
         payload = { ...form };
       }
