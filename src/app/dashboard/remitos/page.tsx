@@ -15,6 +15,24 @@ const toBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
+async function comprimirImagen(file: File, maxPx = 1200, quality = 0.75): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Error al cargar imagen')); };
+    img.src = objectUrl;
+  });
+}
+
 interface Remito {
   id: string; fecha: string; nroRemito: string; razonSocial: string;
   cuit: string; combustible: number; tipoCombustible: string;
@@ -209,7 +227,7 @@ export default function RemitosPage() {
     try {
       let payload: Record<string, string>;
       if (archivo) {
-        const dataUrl = await toBase64(archivo);
+        const dataUrl = await comprimirImagen(archivo);
         payload = { ...form, comprobante: dataUrl };
       } else {
         payload = { ...form };
@@ -220,7 +238,15 @@ export default function RemitosPage() {
         await api.post('/api/remitos', payload);
       }
       cerrarModal(); cargar();
-    } catch { setMsg({ text: 'Error al guardar', ok: false }); }
+    } catch (e: unknown) {
+      const status = (e as {response?: {status?: number}})?.response?.status;
+      if (status === 413) {
+        setMsg({ text: 'La imagen es demasiado grande. Intentá con una foto de menor resolución.', ok: false });
+      } else {
+        const msg = (e as {response?: {data?: {mensaje?: string}}})?.response?.data?.mensaje;
+        setMsg({ text: msg || 'Error al guardar', ok: false });
+      }
+    }
     setSaving(false);
   };
 
