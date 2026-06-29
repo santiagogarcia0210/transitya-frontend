@@ -43,6 +43,24 @@ const toBase64Raw = (file:File):Promise<string> =>
     r.readAsDataURL(file);
   });
 
+async function comprimirImagen(file: File, maxPx = 1200, quality = 0.75): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Error al cargar imagen')); };
+    img.src = objectUrl;
+  });
+}
+
 function normalizar(e:Record<string,unknown>):ReporteKM {
   const ki=Number(e.kmInicial||e['KM INICIAL']||e.km_inicial||0);
   const kf=Number(e.kmFinal||e['KM FINAL']||e.km_final||0);
@@ -168,11 +186,24 @@ export default function ReportesKMPage() {
     setSaving(true);setMsg(null);
     try{
       const payload:Record<string,unknown>={...form,kmRecorridos:String(kmCalc)};
-      if(fotoIniFile){payload.fotoIniBase64=await toBase64Raw(fotoIniFile);payload.mimeTypeFotos=fotoIniFile.type||'image/jpeg';}
-      if(fotoFinFile){payload.fotoFinBase64=await toBase64Raw(fotoFinFile);payload.mimeTypeFotos=fotoFinFile.type||'image/jpeg';}
+      if(fotoIniFile){
+        const dataUrl=await comprimirImagen(fotoIniFile);
+        payload.fotoIniBase64=dataUrl.split(',')[1];
+        payload.mimeTypeFotos='image/jpeg';
+      }
+      if(fotoFinFile){
+        const dataUrl=await comprimirImagen(fotoFinFile);
+        payload.fotoFinBase64=dataUrl.split(',')[1];
+        payload.mimeTypeFotos='image/jpeg';
+      }
       form.id?await api.put(`/api/reportes/${form.id}`,payload):await api.post('/api/reportes',payload);
       cerrar();cargar();
-    }catch{setMsg({text:'Error al guardar',ok:false});}
+    }catch(err:unknown){
+      console.error('[REPORTES-KM] guardar error:',err);
+      const status=(err as {response?:{status?:number}})?.response?.status;
+      if(status===413){setMsg({text:'La foto es muy pesada. Reintentá con una de menor resolución.',ok:false});}
+      else{const m=(err as {response?:{data?:{mensaje?:string}}})?.response?.data?.mensaje;setMsg({text:m||'Error al guardar',ok:false});}
+    }
     setSaving(false);
   };
   const eliminar=async(id:string)=>{try{await api.delete(`/api/reportes/${id}`);setConfirmDel(null);cargar();}catch{/*silent*/}};
