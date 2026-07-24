@@ -1,6 +1,56 @@
-# Notas — Planillas Incluir Salud (rama `fix/planillas-asistencia-dj07`)
+# Notas — Planillas Incluir Salud
 
 Fecha diagnóstico: 2026-07-23 (actualizado en sesión de seguimiento, mismo día)
+
+## Sesión de seguimiento — layout planilla-incluir (rama `fix/planilla-incluir-layout`, sobre `main`)
+
+Después de arreglar el layout de impresión de dj-esc107 (rama separada
+`fix/dj-esc107-layout`, todavía sin mergear, pendiente de que confirmes
+imprimiendo de verdad), correspondía revisar si `planilla-incluir` tenía el
+mismo problema. Se creó esta rama nueva (en vez de seguir en
+`fix/dj-esc107-layout`) para no mezclar dos fixes independientes que todavía
+no están confirmados/mergeados por separado.
+
+**Confirmado: mismo bug de CSS que dj-esc107.** `planilla-incluir/page.tsx`
+también usa `className="dj-page"` con `display:flex` inline para repartir el
+espacio entre la grilla, las 3 firmas y el footer — y por lo tanto también
+queda pisado por la regla `@media print` de `globals.css` que fuerza
+`display:block !important` + `overflow:visible !important` sobre `.dj-page`
+(compartida con dj-esc107, cambio-transporte y presentacion-docs). Mismo fix
+aislado aplicado: clase propia `planilla-incluir-page` + regla de mayor
+especificidad que restaura `display:flex`/`overflow:hidden`, sin tocar la
+regla global. También se cambió `@page margin:0` → `margin:10mm` explícito
+(mismo motivo que en dj-esc107: drivers de impresión como "Microsoft Print to
+PDF" en Windows imponen su propio margen mínimo igual, lo que puede desbordar
+contenido calculado para los 297mm completos a una segunda hoja).
+
+**3 commits separados en esta rama:**
+1. Fix de layout/CSS + agrandar firmas (`minHeight` 24pt→38pt), grilla
+   (52pt→58pt), reordenar footer (logo Incluir Salud grande a la izquierda,
+   ANDIS/Gobierno distribuidos a la derecha, antes los 3 apretados y
+   centrados), reducir un poco el padding lateral de la hoja para aprovechar
+   más ancho útil de A4.
+2. Reestructurar el bloque Referencias/Anexo de 2 celdas fusionadas a las 4
+   celdas separadas que muestra el PDF original (Referencias | Presenta Anexo
+   header | NO/SI apilado | Cantidad de Hojas).
+3. **Bug de 28 días corregido** (estaba documentado como pendiente desde la
+   primera sesión — ver más abajo la sección original de diagnóstico). Al
+   tocar el layout de esta fila resultó natural y acotado: se agrega una fila
+   extra dedicada a Referencias/Anexo cuando el mes tiene exactamente 28 días
+   (múltiplo de 7), en vez de depender de que la última fila de días quede
+   incompleta. No cambia el comportamiento de 29/30/31 días.
+
+**Presupuesto de altura** (mismo método que en dj-esc107, verificado por
+lectura de CSS, no por render real): contenido fijo estimado ≈239mm contra
+≈259mm de área de contenido disponible tras el nuevo padding — deja ≈20mm de
+margen para el único spacer flexible (entre la grilla y las firmas). Sigue
+sin poder confirmarse imprimiendo de verdad en este entorno (sin navegador
+headless) — falta que lo confirmes vos, igual que con dj-esc107.
+
+No se mergeó a `main` — queda en `fix/planilla-incluir-layout` para tu
+revisión.
+
+---
 
 ## Estado de merge a main (chequeado con `git fetch` + `git log origin/main..origin/fix/...`)
 
