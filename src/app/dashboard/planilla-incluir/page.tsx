@@ -67,7 +67,7 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
     WebkitPrintColorAdjust: 'exact',
     printColorAdjust: 'exact',
     width: '14.28%',
-    height: '52pt',
+    height: '58pt',
   };
 
   const DATO: React.CSSProperties = {
@@ -85,7 +85,7 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
 
   const SIG_VAL: React.CSSProperties = {
     display: 'flex', alignItems: 'flex-end',
-    minHeight: '24pt', fontSize: '9pt',
+    minHeight: '38pt', fontSize: '9pt',
   };
 
   const SIG_LBL: React.CSSProperties = {
@@ -94,9 +94,9 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
   };
 
   return (
-    <div className="dj-page" style={{
+    <div className="dj-page planilla-incluir-page" style={{
       width: '210mm', height: '297mm', boxSizing: 'border-box',
-      padding: '10mm 14mm 8mm 16mm',
+      padding: '10mm 12mm 8mm 14mm',
       fontFamily: 'Arial, sans-serif', fontSize: '10pt', color: '#000',
       background: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
@@ -167,11 +167,11 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
                   const aneCols = Math.floor(remaining / 2);
                   return (
                     <>
-                      <td colSpan={refCols} style={{ border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top', height: '52pt', fontSize: '7.5pt', lineHeight: 1.35 }}>
+                      <td colSpan={refCols} style={{ border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top', height: '58pt', fontSize: '7.5pt', lineHeight: 1.35 }}>
                         <strong>Referencias:</strong><br />X = Asistencia normal<br />A = Ausente<br />AP = Ausencia prolongada<br />E = Enfermedad<br />F = Feriado
                       </td>
                       {aneCols > 0 && (
-                        <td colSpan={aneCols} style={{ border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top', height: '52pt', fontSize: '7.5pt', lineHeight: 1.6 }}>
+                        <td colSpan={aneCols} style={{ border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top', height: '58pt', fontSize: '7.5pt', lineHeight: 1.6 }}>
                           <strong>Presenta Anexo (Observaciones):</strong><br />NO&nbsp;&nbsp;☐&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SI&nbsp;&nbsp;☐<br />Cantidad de Hojas: ________
                         </td>
                       )}
@@ -229,14 +229,16 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
         </div>
       </div>
 
-      {/* LOGOS FOOTER */}
-      <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14pt' }}>
+      {/* LOGOS FOOTER — Incluir Salud destacado a la izquierda, resto distribuido a lo ancho */}
+      <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={LOGO_IS_COLOR} alt="Incluir Salud" style={{ height: '32pt', width: 'auto' }} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={LOGO_ANDIS} alt="ANDIS" style={{ height: '32pt', width: 'auto' }} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={LOGO_GOB} alt="Gobierno de Tucumán" style={{ height: '32pt', width: 'auto' }} />
+        <img src={LOGO_IS_COLOR} alt="Incluir Salud" style={{ height: '38pt', width: 'auto' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14pt' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={LOGO_ANDIS} alt="ANDIS" style={{ height: '32pt', width: 'auto' }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={LOGO_GOB} alt="Gobierno de Tucumán" style={{ height: '32pt', width: 'auto' }} />
+        </div>
       </div>
     </div>
   );
@@ -308,7 +310,35 @@ export default function PlanillaIncluirPage() {
           body { margin: 0; background: #fff !important; }
           .dj-page { page-break-after: always; }
           .dj-page:last-child { page-break-after: auto; }
-          @page { size: A4 portrait; margin: 0; }
+
+          /*
+           * margin:0 depende de que el driver de impresión lo respete —
+           * varios (ej. "Microsoft Print to PDF" en Windows) imponen su
+           * propio margen mínimo igual, lo que desborda el contenido
+           * calculado para 297mm completos a una segunda hoja. Se declara
+           * un margen explícito que el driver va a respetar sin recortar
+           * nada por su cuenta (mismo criterio aplicado en dj-esc107).
+           */
+          @page { size: A4 portrait; margin: 10mm; }
+
+          /*
+           * globals.css fuerza .dj-page a display:block + overflow:visible
+           * en @media print (regla compartida con dj-esc107, cambio-transporte
+           * y presentacion-docs). Esta plantilla depende de flex-column +
+           * overflow:hidden para repartir el espacio vertical entre la
+           * grilla, las firmas y el footer. Se restaura sólo para esta
+           * plantilla vía clase propia (mayor especificidad que globals.css),
+           * sin tocar la regla global ni afectar a las otras plantillas.
+           */
+          .dj-page.planilla-incluir-page {
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+            width: 190mm !important;
+            height: 277mm !important;
+            max-height: 277mm !important;
+            padding: 10mm 12mm 8mm 14mm !important;
+          }
         }
       `}</style>
 
