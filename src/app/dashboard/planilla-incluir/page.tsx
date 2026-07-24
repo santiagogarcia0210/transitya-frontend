@@ -54,7 +54,7 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
   const BANDA: React.CSSProperties = {
     flexShrink: 0,
     background: '#b0b0b0', padding: '4pt 8pt',
-    fontSize: '10.5pt', fontWeight: 'bold',
+    fontSize: '11pt', fontWeight: 'bold', textAlign: 'center',
     color: '#000',
     WebkitPrintColorAdjust: 'exact',
     printColorAdjust: 'exact',
@@ -63,11 +63,34 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
   const tdBase: React.CSSProperties = {
     border: '1px solid #000',
     verticalAlign: 'top',
-    padding: '2pt 2pt',
+    padding: 0,
     WebkitPrintColorAdjust: 'exact',
     printColorAdjust: 'exact',
     width: '14.28%',
     height: '52pt',
+  };
+
+  const DATO: React.CSSProperties = {
+    display: 'flex', alignItems: 'flex-end', gap: '6pt',
+    fontSize: '9.5pt', marginBottom: '5pt',
+  };
+
+  const SIG_BOX: React.CSSProperties = {
+    flexShrink: 0,
+    border: '1.2pt solid #000', borderRadius: '8pt',
+    padding: '3pt 10pt', marginBottom: '5pt',
+    WebkitPrintColorAdjust: 'exact',
+    printColorAdjust: 'exact',
+  };
+
+  const SIG_VAL: React.CSSProperties = {
+    display: 'flex', alignItems: 'flex-end',
+    minHeight: '24pt', fontSize: '9pt',
+  };
+
+  const SIG_LBL: React.CSSProperties = {
+    display: 'flex', borderTop: '1px dotted #666',
+    paddingTop: '2pt', fontSize: '7.5pt',
   };
 
   return (
@@ -80,78 +103,76 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
 
       {/* LOGO IS */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <div style={{ flexShrink: 0, marginBottom: '3pt' }}><img src={LOGO_IS} alt="IS" style={{ height: '54pt', width: 'auto', display: 'block' }} /></div>
+      <div style={{ flexShrink: 0, marginBottom: '4pt' }}><img src={LOGO_IS} alt="IS" style={{ height: '50pt', width: 'auto', display: 'block' }} /></div>
 
       {/* TITULO */}
-      <div style={BANDA}>PLANILLA CONFORMIDAD EFECTIVA PRESTACIÓN DE TRANSPORTE</div>
+      <div style={BANDA}>PLANILLA CONFORMIDAD EFECTIVA PRESTACIÓN TRANSPORTE</div>
 
       {/* SUBTITULO */}
-      <div style={{ flexShrink: 0, fontSize: '8.5pt', fontWeight: 'bold', textAlign: 'center', padding: '2pt 0 3pt', color: '#333' }}>
-        Incluir Salud — U.G.P. Tucumán
+      <div style={{ flexShrink: 0, fontSize: '10.5pt', fontWeight: 'bold', textAlign: 'center', padding: '3pt 0 6pt' }}>
+        Incluir Salud U.G.P. Tucumán
       </div>
 
       {/* DATOS DEL BENEFICIARIO */}
-      <div style={{ flexShrink: 0, border: '1px solid #000', padding: '3pt 6pt', marginBottom: '3pt' }}>
-        <div style={{ display: 'flex', gap: '4pt', fontSize: '9.5pt', marginBottom: '2pt' }}>
-          <span style={{ fontWeight: 'bold', minWidth: '90pt' }}>Transportista:</span>
-          <span style={{ fontWeight: 'bold' }}>FLORES MARIA JOSE</span>
+      <div style={{ flexShrink: 0, marginBottom: '4pt' }}>
+        <div style={DATO}>
+          <span style={{ minWidth: '95pt' }}>Transportista:</span>
+          <span style={{ borderBottom: '1px dotted #555', flex: 1, fontWeight: 'bold' }}>FLORES MARIA JOSE</span>
         </div>
-        <div style={{ display: 'flex', gap: '4pt', fontSize: '9.5pt', marginBottom: '2pt' }}>
-          <span style={{ fontWeight: 'bold', minWidth: '90pt' }}>Apellido y Nombre:</span>
-          <span style={{ borderBottom: '1px solid #555', flex: 1, fontWeight: 'bold' }}>{nombre}</span>
+        <div style={DATO}>
+          <span style={{ minWidth: '95pt' }}>Apellido y Nombre:</span>
+          <span style={{ borderBottom: '1px dotted #555', flex: 1, fontWeight: 'bold' }}>{nombre}</span>
         </div>
-        <div style={{ display: 'flex', gap: '4pt', fontSize: '9.5pt', marginBottom: '2pt' }}>
-          <span style={{ fontWeight: 'bold', minWidth: '90pt' }}>Beneficio Nro.:</span>
-          <span style={{ borderBottom: '1px solid #555', minWidth: '140pt' }}>{nroAfiliado}</span>
+        <div style={DATO}>
+          <span style={{ minWidth: '95pt' }}>Beneficio Nro.:</span>
+          <span style={{ borderBottom: '1px dotted #555', minWidth: '200pt', fontWeight: 'bold' }}>{nroAfiliado}</span>
         </div>
-        <div style={{ display: 'flex', gap: '4pt', fontSize: '9.5pt' }}>
-          <span style={{ fontWeight: 'bold', minWidth: '90pt' }}>Período:</span>
-          <span style={{ fontWeight: 'bold' }}>{mesNombre} / {anio}</span>
+        <div style={{ ...DATO, marginBottom: 0 }}>
+          <span style={{ minWidth: '95pt' }}>Año y mes declarado:</span>
+          <span style={{ fontWeight: 'bold', fontSize: '10.5pt', paddingLeft: '20pt' }}>{mesNombre.toUpperCase()}/{anio}</span>
         </div>
       </div>
 
       {/* CALENDARIO */}
-      <table style={{ flexShrink: 0, width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginBottom: '3pt' }}>
+      <table style={{ flexShrink: 0, width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', marginBottom: '6pt' }}>
         <tbody>
           {rows.map((row, rIdx) => {
             const isLast = rIdx === rows.length - 1;
             const remaining = 7 - row.length;
             return (
               <tr key={rIdx}>
-                {row.map((d, ci) => {
-                  const bg = d.esDomingo ? '#888888' : d.esSabado ? '#c0c0c0' : '#fff';
-                  return (
-                    <td key={ci} style={{ ...tdBase, background: bg }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', gap: '1pt' }}>
-                        <div style={{ fontSize: '11pt', fontWeight: 'bold', width: '100%', textAlign: 'center', lineHeight: 1.3, borderBottom: '1px solid #555' }}>
-                          {String(d.dia).padStart(2, '0')}
-                        </div>
-                        <div style={{ fontSize: '7pt', color: '#333', width: '100%', textAlign: 'center', borderBottom: '1px solid #aaa' }}>
-                          {String(d.dia).padStart(2, '0')}/{mesStr}/{anio}
-                        </div>
-                        {d.esDomingo ? (
-                          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10pt', fontWeight: 'bold' }}>DOMINGO</div>
-                        ) : d.esSabado ? (
-                          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10pt', fontWeight: 'bold' }}>SÁBADO</div>
-                        ) : (
-                          <div style={{ flex: 1 }} />
-                        )}
+                {row.map((d, ci) => (
+                  <td key={ci} style={tdBase}>
+                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                      <div style={{ fontSize: '10pt', fontWeight: 'bold', textAlign: 'center', lineHeight: 1.35, borderBottom: '1px solid #000' }}>
+                        {d.dia}
                       </div>
-                    </td>
-                  );
-                })}
+                      <div style={{ fontSize: '6.5pt', color: '#333', textAlign: 'center', padding: '1pt 0', borderBottom: '1px solid #999' }}>
+                        {String(d.dia).padStart(2, '0')}/{mesStr}/{anio}
+                      </div>
+                      <div style={{
+                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '8.5pt', fontWeight: 'bold',
+                        background: d.esDomingo || d.esSabado ? '#c0c0c0' : 'transparent',
+                        WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact',
+                      }}>
+                        {d.esDomingo ? 'DOMINGO' : d.esSabado ? 'SÁBADO' : ''}
+                      </div>
+                    </div>
+                  </td>
+                ))}
                 {/* Últimas celdas con Referencias y Anexo */}
                 {isLast && remaining > 0 && (() => {
                   const refCols = Math.ceil(remaining / 2);
                   const aneCols = Math.floor(remaining / 2);
                   return (
                     <>
-                      <td colSpan={refCols} style={{ border: '1px solid #000', padding: '4pt 6pt', verticalAlign: 'top', height: '52pt', fontSize: '8pt' }}>
+                      <td colSpan={refCols} style={{ border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top', height: '52pt', fontSize: '7.5pt', lineHeight: 1.35 }}>
                         <strong>Referencias:</strong><br />X = Asistencia normal<br />A = Ausente<br />AP = Ausencia prolongada<br />E = Enfermedad<br />F = Feriado
                       </td>
                       {aneCols > 0 && (
-                        <td colSpan={aneCols} style={{ border: '1px solid #000', padding: '4pt 6pt', verticalAlign: 'top', height: '52pt', fontSize: '8pt' }}>
-                          <strong>Presenta Anexo<br />(Observaciones)</strong><br />NO<br />SI<br />Cantidad de Hojas:
+                        <td colSpan={aneCols} style={{ border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top', height: '52pt', fontSize: '7.5pt', lineHeight: 1.6 }}>
+                          <strong>Presenta Anexo (Observaciones):</strong><br />NO&nbsp;&nbsp;☐&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SI&nbsp;&nbsp;☐<br />Cantidad de Hojas: ________
                         </td>
                       )}
                     </>
@@ -163,66 +184,59 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
         </tbody>
       </table>
 
+      <div style={{ flex: '1 1 auto' }} />
+
       {/* FIRMA TRANSPORTISTA */}
-      <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', marginBottom: '3pt' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '8.5pt' }}>
-          <tbody>
-            <tr>
-              <td style={{ padding: '12pt 4pt 2pt', textAlign: 'center', borderRight: '1px solid #000', width: '30%' }}></td>
-              <td style={{ padding: '2pt 4pt', textAlign: 'center', borderRight: '1px solid #000', width: '28%' }}>Flores Maria Jose</td>
-              <td style={{ padding: '2pt 4pt', textAlign: 'center', borderRight: '1px solid #000', width: '18%' }}>26.638.377</td>
-              <td style={{ padding: '2pt 4pt', textAlign: 'center', width: '24%' }}>{fechaFirma}</td>
-            </tr>
-            <tr style={{ borderTop: '1px solid #000' }}>
-              <td style={{ padding: '2pt 4pt', textAlign: 'center', borderRight: '1px solid #000', fontSize: '7.5pt' }}>Firma/Sello Transportista</td>
-              <td style={{ padding: '2pt 4pt', textAlign: 'center', borderRight: '1px solid #000', fontSize: '7.5pt' }}>Aclaración</td>
-              <td style={{ padding: '2pt 4pt', textAlign: 'center', borderRight: '1px solid #000', fontSize: '7.5pt' }}>DNI</td>
-              <td style={{ padding: '2pt 4pt', textAlign: 'center', fontSize: '7.5pt' }}>Fecha</td>
-            </tr>
-          </tbody>
-        </table>
+      <div style={SIG_BOX}>
+        <div style={SIG_VAL}>
+          <span style={{ width: '32%' }} />
+          <span style={{ width: '30%', textAlign: 'center' }}>Flores Maria Jose</span>
+          <span style={{ width: '18%', textAlign: 'center' }}>26.638.377</span>
+          <span style={{ width: '20%', textAlign: 'center' }}>{fechaFirma}</span>
+        </div>
+        <div style={SIG_LBL}>
+          <span style={{ width: '32%' }}>Firma/Sello Transportista</span>
+          <span style={{ width: '30%', textAlign: 'center' }}>Aclaración</span>
+          <span style={{ width: '18%', textAlign: 'center' }}>DNI</span>
+          <span style={{ width: '20%', textAlign: 'center' }}>Fecha</span>
+        </div>
       </div>
 
       {/* FIRMA FAMILIAR/TUTOR */}
-      <div style={{ flexShrink: 0, marginBottom: '3pt' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
-          <tbody>
-            <tr style={{ borderTop: '1px solid #000' }}>
-              <td style={{ padding: '10pt 4pt 2pt', width: '36%' }}>Firma Familiar/Responsable/Tutor</td>
-              <td style={{ padding: '10pt 4pt 2pt', width: '24%' }}>Aclaración</td>
-              <td style={{ padding: '10pt 4pt 2pt', width: '18%' }}>DNI</td>
-              <td style={{ padding: '10pt 4pt 2pt', width: '22%', textAlign: 'right' }}>{fechaFirma}</td>
-            </tr>
-          </tbody>
-        </table>
+      <div style={SIG_BOX}>
+        <div style={SIG_VAL}>
+          <span style={{ width: '32%' }} />
+          <span style={{ width: '30%' }} />
+          <span style={{ width: '18%' }} />
+          <span style={{ width: '20%', textAlign: 'center' }}>{fechaFirma}</span>
+        </div>
+        <div style={SIG_LBL}>
+          <span style={{ width: '32%' }}>Firma Familiar/Responsable/Tutor</span>
+          <span style={{ width: '30%', textAlign: 'center' }}>Aclaración</span>
+          <span style={{ width: '18%', textAlign: 'center' }}>DNI</span>
+          <span style={{ width: '20%', textAlign: 'center' }}>Fecha</span>
+        </div>
       </div>
 
       {/* FIRMA RESPONSABLE CENTRO */}
-      <div style={{ flexShrink: 0, marginBottom: '4pt' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '8.5pt' }}>
-          <tbody>
-            <tr>
-              <td style={{ padding: '12pt 4pt 2pt', textAlign: 'center', borderRight: '1px solid #000', width: '34%' }}></td>
-              <td style={{ padding: '12pt 4pt 2pt', textAlign: 'center', borderRight: '1px solid #000', width: '32%' }}></td>
-              <td style={{ padding: '12pt 4pt 2pt', textAlign: 'center', width: '34%' }}></td>
-            </tr>
-            <tr style={{ borderTop: '1px solid #000' }}>
-              <td style={{ padding: '2pt 4pt', textAlign: 'center', borderRight: '1px solid #000', fontSize: '7.5pt' }}>Firma Responsable Centro</td>
-              <td style={{ padding: '2pt 4pt', textAlign: 'center', borderRight: '1px solid #000', fontSize: '7.5pt' }}>Aclaración</td>
-              <td style={{ padding: '2pt 4pt', textAlign: 'center', fontSize: '7.5pt' }}>Sello Centro</td>
-            </tr>
-          </tbody>
-        </table>
+      <div style={{ ...SIG_BOX, marginBottom: '8pt' }}>
+        <div style={SIG_VAL} />
+        <div style={SIG_LBL}>
+          <span style={{ width: '28%' }}>Firma Responsable Centro</span>
+          <span style={{ width: '24%', textAlign: 'center' }}>Aclaración</span>
+          <span style={{ width: '28%', textAlign: 'center' }}>Sello Centro</span>
+          <span style={{ width: '20%', textAlign: 'center' }}>Fecha</span>
+        </div>
       </div>
 
       {/* LOGOS FOOTER */}
-      <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10pt' }}>
+      <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14pt' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={LOGO_IS_COLOR} alt="IS Color" style={{ height: '30pt', width: 'auto' }} />
+        <img src={LOGO_IS_COLOR} alt="Incluir Salud" style={{ height: '32pt', width: 'auto' }} />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={LOGO_ANDIS} alt="ANDIS" style={{ height: '30pt', width: 'auto' }} />
+        <img src={LOGO_ANDIS} alt="ANDIS" style={{ height: '32pt', width: 'auto' }} />
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={LOGO_GOB} alt="Gobierno" style={{ height: '30pt', width: 'auto' }} />
+        <img src={LOGO_GOB} alt="Gobierno de Tucumán" style={{ height: '32pt', width: 'auto' }} />
       </div>
     </div>
   );

@@ -17,7 +17,7 @@ interface Beneficiario {
 function normB(b: Record<string,unknown>): Beneficiario {
   return {
     id:          String(b.id          || ''),
-    nombre:      String(b.nombre      || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
+    nombre:      String(b.nombre      || b.apellidoNombre || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
     nroAfiliado: String(b.nroAfiliado || b['N° AFILIADO'] || b.nro_afiliado || b.beneficiario || ''),
     dni:         String(b.dni         || b.DNI || ''),
     chofer:      String(b.chofer      || b.CHOFER || ''),
@@ -85,8 +85,8 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
       </div>
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'stretch', fontSize: '11pt' }}>
         <span style={{ minWidth: '130pt', display: 'flex', alignItems: 'center' }}>BENEFICIO Nro</span>
-        <span style={{ border: '1px solid #000', borderTop: 'none', padding: '3pt 6pt', minWidth: '185pt' }}>
-          Beneficio Nro.: {b.nroAfiliado}
+        <span style={{ border: '1px solid #000', borderTop: 'none', padding: '3pt 6pt', minWidth: '185pt', fontWeight: 'bold' }}>
+          {b.nroAfiliado}
         </span>
         <span style={{ flex: 1 }} />
       </div>
@@ -133,7 +133,7 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
 
       {/* FECHA INSTITUCIÓN */}
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-end', gap: '4pt', fontSize: '11pt' }}>
-        <span style={{ minWidth: '128pt' }}>Fecha (DD/MM/YYYY)</span>
+        <span style={{ minWidth: '128pt' }}>Fecha (DD/MM/YYYY):</span>
         <span style={{ borderBottom: '1px solid #000', minWidth: '30pt', textAlign: 'center', display: 'inline-block', padding: '0 4pt' }}>{ultimoDia}</span>
         <span style={{ padding: '0 3pt' }}>/</span>
         <span style={{ borderBottom: '1px solid #000', minWidth: '54pt', textAlign: 'center', display: 'inline-block', padding: '0 4pt' }}>{mesNombre}</span>
