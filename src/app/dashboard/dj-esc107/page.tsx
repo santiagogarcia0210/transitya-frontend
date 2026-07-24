@@ -17,7 +17,7 @@ interface Beneficiario {
 function normB(b: Record<string,unknown>): Beneficiario {
   return {
     id:          String(b.id          || ''),
-    nombre:      String(b.nombre      || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
+    nombre:      String(b.nombre      || b.apellidoNombre || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
     nroAfiliado: String(b.nroAfiliado || b['N° AFILIADO'] || b.nro_afiliado || b.beneficiario || ''),
     dni:         String(b.dni         || b.DNI || ''),
     chofer:      String(b.chofer      || b.CHOFER || ''),
