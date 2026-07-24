@@ -161,20 +161,35 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
                     </div>
                   </td>
                 ))}
-                {/* Últimas celdas con Referencias y Anexo */}
+                {/* Referencias / Anexo — 4 celdas separadas, igual al original:
+                    Referencias | Presenta Anexo (header) | NO/SI apilado | Cantidad de Hojas */}
                 {isLast && remaining > 0 && (() => {
-                  const refCols = Math.ceil(remaining / 2);
-                  const aneCols = Math.floor(remaining / 2);
+                  const infoTd: React.CSSProperties = {
+                    border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top',
+                    height: '58pt', fontSize: '7.5pt', lineHeight: 1.35,
+                  };
+                  // remaining >= 4 siempre (4 para 31 días, 7 para la fila extra de 28 días).
+                  // El excedente sobre el mínimo de 1 columna por celda se lo lleva primero
+                  // Referencias (tiene el texto más largo) y luego Presenta Anexo.
+                  const extra      = remaining - 4;
+                  const refCols    = 1 + Math.min(extra, 2);
+                  const anexoCols  = 1 + Math.max(0, extra - 2);
+                  const noSiCols   = 1;
+                  const hojasCols  = remaining - refCols - anexoCols - noSiCols;
                   return (
                     <>
-                      <td colSpan={refCols} style={{ border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top', height: '58pt', fontSize: '7.5pt', lineHeight: 1.35 }}>
+                      <td colSpan={refCols} style={infoTd}>
                         <strong>Referencias:</strong><br />X = Asistencia normal<br />A = Ausente<br />AP = Ausencia prolongada<br />E = Enfermedad<br />F = Feriado
                       </td>
-                      {aneCols > 0 && (
-                        <td colSpan={aneCols} style={{ border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top', height: '58pt', fontSize: '7.5pt', lineHeight: 1.6 }}>
-                          <strong>Presenta Anexo (Observaciones):</strong><br />NO&nbsp;&nbsp;☐&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SI&nbsp;&nbsp;☐<br />Cantidad de Hojas: ________
-                        </td>
-                      )}
+                      <td colSpan={anexoCols} style={{ ...infoTd, lineHeight: 1.5 }}>
+                        <strong>Presenta Anexo<br />(Observaciones):</strong>
+                      </td>
+                      <td colSpan={noSiCols} style={{ ...infoTd, lineHeight: 1.6 }}>
+                        NO&nbsp;☐<br />SI&nbsp;☐
+                      </td>
+                      <td colSpan={hojasCols} style={{ ...infoTd, lineHeight: 1.5 }}>
+                        Cantidad de<br />Hojas: ____
+                      </td>
                     </>
                   );
                 })()}
