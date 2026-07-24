@@ -1,6 +1,60 @@
 # Notas — Planillas Incluir Salud (rama `fix/planillas-asistencia-dj07`)
 
-Fecha diagnóstico: 2026-07-23
+Fecha diagnóstico: 2026-07-23 (actualizado en sesión de seguimiento, mismo día)
+
+## Estado de merge a main (chequeado con `git fetch` + `git log origin/main..origin/fix/...`)
+
+**La rama NO está mergeada a `main`.** `git merge-base --is-ancestor` confirma que
+`origin/fix/planillas-asistencia-dj07` no es ancestro de `origin/main`. Contiene 3
+commits que main no tiene: `e1cc62d`, `6b67762`, `8d6dd09` (más los de esta sesión de
+seguimiento). Si el deploy de Vercel está configurado para promocionar a producción
+sólo la rama `main`, **esto explica por qué estos cambios no llegaron a producción**:
+quedan como preview deploys de la rama hasta que alguien la mergee. No se mergeó
+automáticamente — queda a la espera de tu revisión.
+
+## Bug de nombres faltantes en DJ ESC 07 — ENCONTRADO Y CORREGIDO
+
+Causa raíz confirmada comparando el flujo de datos de Planilla A/Asistencia vs DJ
+ESC 07:
+
+- `toArray()` (`src/lib/utils.ts`) prioriza la clave `filas` sobre `planillas` y
+  `beneficiarios`. Ambos endpoints primarios (`/api/planillas/incluir` y
+  `/api/planillas/dj107`) devuelven la data bajo `filas`, así que `toArray(d)` sí
+  la extrae — mi diagnóstico previo de que "ambos caían siempre al fallback" era
+  incorrecto para DJ ESC 07.
+- **Planilla A / grilla** (`planilla-incluir/page.tsx`): su filtro
+  `b.nroAfiliado || b['N° AFILIADO'] || b.nro_afiliado` no matchea el campo real
+  que devuelve `/api/planillas/incluir` (que usa `afiliado`, sin ese casing), así
+  que el filtro deja el array vacío y **sí** cae al fallback `/api/beneficiarios`.
+  Ese fallback usa el campo real de Firestore `APELLIDO Y NOMBRE`, que el `normB`
+  de esa página sí reconoce → por eso ahí el nombre siempre se vio bien.
+- **DJ ESC 07** (`dj-esc107/page.tsx`): su filtro es `b.nroAfiliado || ...`, y el
+  backend (`transitya-backend/routes/planillas.js:102`, endpoint `/dj107`) sí
+  devuelve el campo `nroAfiliado` (camelCase) — el filtro matchea y el fetch
+  primario **tiene éxito**, sin caer al fallback. Pero ese mismo endpoint devuelve
+  el nombre bajo la clave `apellidoNombre` (línea 103 de `planillas.js`), y el
+  `normB` de `dj-esc107/page.tsx` sólo buscaba `b.nombre`, `b['APELLIDO Y NOMBRE']`
+  o `b.NOMBRE` — ninguno matchea `apellidoNombre`. Resultado: `nroAfiliado` se
+  resuelve bien (por eso el número siempre apareció), pero `nombre` queda como
+  `''` para todos los beneficiarios.
+
+**Fix aplicado** (sólo en el lado de la plantilla, sin tocar el backend ni
+renombrar ningún campo de Firestore): se agregó `b.apellidoNombre` a la cadena de
+fallback de `normB` en `dj-esc107/page.tsx`:
+
+```ts
+nombre: String(b.nombre || b.apellidoNombre || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
+```
+
+Nota relacionada (no corregida, ver "Otro hallazgo" más abajo): el mismo tipo de
+desajuste de nombres de campo existe en `/api/planillas/incluir` (usa `afiliado`
+en vez de `nroAfiliado`/`N° AFILIADO`), pero ahí no rompe nada visible porque el
+filtro falla y cae de forma transparente al fallback correcto. Se deja anotado
+por si en el futuro se quiere que Planilla A también use los datos enriquecidos
+(monto, obra social, estado) del endpoint `/incluir` en vez de depender siempre
+del fallback — eso sí implicaría decidir si se ajusta el filtro/mapeo del
+frontend o los nombres de campo del backend, por eso lo dejo para tu revisión en
+vez de tocarlo ahora.
 
 ## Resumen ejecutivo
 
