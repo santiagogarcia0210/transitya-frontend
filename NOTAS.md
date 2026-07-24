@@ -2,6 +2,53 @@
 
 Fecha diagnóstico: 2026-07-23 (actualizado en sesión de seguimiento, mismo día)
 
+## Iteración — desborde a 2da hoja + líneas de firma de más + fecha con nombre de mes
+
+Después del fix de layout anterior (`display:flex` restaurado), al imprimir de
+verdad apareció un desborde real: logo cortado arriba y footer cayendo a una
+segunda hoja. Causa más probable: `@page { margin: 0 }` depende de que el
+navegador/driver de impresión respete margen cero — en Windows, "Microsoft
+Print to PDF" y muchos drivers de impresora imponen un margen mínimo propio sin
+importar el CSS, así que el contenido (calculado para ocupar los 297mm
+completos) terminaba compitiendo con un margen "gratis" que el driver agregaba
+por su cuenta, empujando el final del contenido a una hoja extra.
+
+**Fix**: se declaró `@page { margin: 10mm }` explícito (en vez de 0) y la caja
+`.dje107-page` en impresión se dimensiona al área imprimible resultante
+(190mm × 277mm) en lugar de a la hoja A4 completa — así el margen lo maneja el
+propio motor de impresión de forma predecible, sin pelear con un valor que
+varios drivers no respetan igual.
+
+**Cálculo de presupuesto de altura** (verificable por lectura del CSS, no por
+render real — ver limitación de la sesión anterior, sigue aplicando):
+área de contenido tras padding ≈ 255mm de alto. Sumando todos los elementos de
+altura fija (logo achicado a 68pt, bandas, filas de datos, textos, firmas,
+footer) da ≈159mm — deja ≈96mm de margen repartido entre los spacers flexibles
+(11 unidades de peso en total, ≈8.7mm por unidad), bastante colchón incluso si
+la estimación de métricas de fuente del navegador difiere un poco de la mía.
+Antes de este ajuste el mismo cálculo con logo a 85pt y márgenes más generosos
+ya cerraba en el papel (~269mm de área vs ~170mm de contenido fijo), lo que
+refuerza que el desborde real venía del margen del driver de impresión, no de
+la matemática del CSS en sí.
+
+Además, para tener más margen de seguridad igual (no depender sólo de la
+teoría del margen del driver): logo `85pt→68pt`, separación entre
+Firma/Aclaración `18pt→12pt`, spacer previo al footer `flex:2→flex:1`.
+
+**Líneas de firma removidas** (el PDF original sólo tiene el label, sin línea
+— el espacio en blanco arriba del label es donde se firma a mano):
+"Firma Titular/Familiar/Responsable/Tutor" perdió su línea a la derecha.
+"Firma y Sello Responsable Institución" / "Sello Institución" ya no tenían
+línea (estaban bien desde el fix anterior). Aclaración y DNI mantienen su
+línea, como en el original.
+
+**Formato de fecha**: "31 / Julio / 2026" → "31 / 07 / 2026" (mes numérico con
+cero a la izquierda, `mesStr` en vez de `mesNombre`) en ambas secciones
+(Tutor e Institución), consistente con el label "(DD/MM/YYYY)".
+
+Sigue sin poder confirmarse imprimiendo de verdad en este entorno (sin
+navegador headless) — falta que lo confirmes vos.
+
 ## Sesión de seguimiento — layout DJ ESC 07 (rama `fix/dj-esc107-layout`, sobre `main`)
 
 La rama `fix/planillas-asistencia-dj07` ya está mergeada a `main` (ver más abajo,

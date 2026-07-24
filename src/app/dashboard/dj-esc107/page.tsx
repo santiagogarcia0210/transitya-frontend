@@ -31,6 +31,7 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
   const LOGO_GOB   = '/logos/logo-gob.jpg';
 
   const mesNombre     = MESES[mes - 1];
+  const mesStr        = String(mes).padStart(2, '0');
   const anioFormateado = String(anio);
   // Último día del mes (DD)
   const ultimoDia = String(new Date(anio, mes, 0).getDate()).padStart(2, '0');
@@ -48,15 +49,15 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
   return (
     <div className="dj-page dje107-page" style={{
       width: '210mm', height: '297mm', boxSizing: 'border-box',
-      padding: '16mm 18mm 12mm 20mm',
+      padding: '12mm 14mm 10mm 16mm',
       fontFamily: 'Arial, sans-serif', fontSize: '11pt', color: '#000',
       background: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
 
       {/* LOGO IS */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <div style={{ flexShrink: 0, marginBottom: '8pt' }}>
-        <img src={LOGO_IS} alt="Incluir Salud" style={{ height: '85pt', width: 'auto', display: 'block' }} />
+      <div style={{ flexShrink: 0, marginBottom: '6pt' }}>
+        <img src={LOGO_IS} alt="Incluir Salud" style={{ height: '68pt', width: 'auto', display: 'block' }} />
       </div>
 
       {/* TITULO */}
@@ -106,19 +107,18 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
         <span style={{ minWidth: '128pt' }}>Fecha (DD/MM/YYYY):</span>
         <span style={{ borderBottom: '1px solid #000', minWidth: '30pt', textAlign: 'center', display: 'inline-block', padding: '0 4pt' }}>{ultimoDia}</span>
         <span style={{ padding: '0 3pt' }}>/</span>
-        <span style={{ borderBottom: '1px solid #000', minWidth: '54pt', textAlign: 'center', display: 'inline-block', padding: '0 4pt' }}>{mesNombre}</span>
+        <span style={{ borderBottom: '1px solid #000', minWidth: '30pt', textAlign: 'center', display: 'inline-block', padding: '0 4pt' }}>{mesStr}</span>
         <span style={{ padding: '0 3pt' }}>/</span>
         <span style={{ borderBottom: '1px solid #000', minWidth: '44pt', textAlign: 'center', display: 'inline-block', padding: '0 4pt' }}>{anioFormateado}</span>
       </div>
 
       <div style={{ flex: '3 1 auto' }} />
 
-      {/* FIRMA TUTOR */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-end', gap: '6pt', fontSize: '11pt', marginBottom: '18pt' }}>
-        <span style={{ minWidth: '185pt', whiteSpace: 'nowrap' }}>Firma Titular/Familiar/Responsable/Tutor</span>
-        <span style={{ flex: 1, borderBottom: '1px solid #000', display: 'inline-block' }} />
+      {/* FIRMA TUTOR — sólo el label, sin línea (el espacio en blanco de arriba es donde va la firma, igual que el original) */}
+      <div style={{ flexShrink: 0, fontSize: '11pt', marginBottom: '12pt' }}>
+        Firma Titular/Familiar/Responsable/Tutor
       </div>
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-end', gap: '6pt', fontSize: '11pt', marginBottom: '18pt' }}>
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-end', gap: '6pt', fontSize: '11pt', marginBottom: '12pt' }}>
         <span style={{ minWidth: '70pt', whiteSpace: 'nowrap' }}>Aclaración</span>
         <span style={{ borderBottom: '1px solid #000', display: 'inline-block', minWidth: '170pt' }} />
       </div>
@@ -138,20 +138,20 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
         <span style={{ minWidth: '128pt' }}>Fecha (DD/MM/YYYY):</span>
         <span style={{ borderBottom: '1px solid #000', minWidth: '30pt', textAlign: 'center', display: 'inline-block', padding: '0 4pt' }}>{ultimoDia}</span>
         <span style={{ padding: '0 3pt' }}>/</span>
-        <span style={{ borderBottom: '1px solid #000', minWidth: '54pt', textAlign: 'center', display: 'inline-block', padding: '0 4pt' }}>{mesNombre}</span>
+        <span style={{ borderBottom: '1px solid #000', minWidth: '30pt', textAlign: 'center', display: 'inline-block', padding: '0 4pt' }}>{mesStr}</span>
         <span style={{ padding: '0 3pt' }}>/</span>
         <span style={{ borderBottom: '1px solid #000', minWidth: '44pt', textAlign: 'center', display: 'inline-block', padding: '0 4pt' }}>{anioFormateado}</span>
       </div>
 
       <div style={{ flex: '3 1 auto' }} />
 
-      {/* FIRMA INSTITUCIÓN */}
+      {/* FIRMA INSTITUCIÓN — sólo labels, sin líneas (igual que el original) */}
       <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', fontSize: '11pt' }}>
         <span>Firma y Sello Responsable Institución</span>
         <span>Sello Institución</span>
       </div>
 
-      <div style={{ flex: '2 1 auto' }} />
+      <div style={{ flex: '1 1 auto' }} />
 
       {/* LOGOS FOOTER */}
       <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16pt' }}>
@@ -244,7 +244,19 @@ export default function DJEsc107Page() {
           body { margin: 0; background: #fff !important; }
           .dj-page { page-break-after: always; }
           .dj-page:last-child { page-break-after: auto; }
-          @page { size: A4 portrait; margin: 0; }
+
+          /*
+           * margin:0 dependía de que el navegador/driver de impresión respete
+           * un @page sin margen — muchos drivers (ej. "Microsoft Print to PDF"
+           * en Windows) imponen un margen mínimo propio igual, y ese margen
+           * "gratis" hacía que el contenido (calculado para 297mm completos)
+           * se desbordara a una segunda hoja y el logo del header apareciera
+           * cortado arriba. Se declara un margen explícito de 10mm que el
+           * driver va a respetar sin recortar nada por su cuenta, y la caja
+           * de la plantilla se dimensiona al área imprimible resultante
+           * (190mm x 277mm) en vez de a la hoja A4 completa.
+           */
+          @page { size: A4 portrait; margin: 10mm; }
 
           /*
            * globals.css fuerza .dj-page a display:block + overflow:visible
@@ -260,7 +272,10 @@ export default function DJEsc107Page() {
             display: flex !important;
             flex-direction: column !important;
             overflow: hidden !important;
-            padding: 16mm 18mm 12mm 20mm !important;
+            width: 190mm !important;
+            height: 277mm !important;
+            max-height: 277mm !important;
+            padding: 12mm 14mm 10mm 16mm !important;
           }
         }
       `}</style>
