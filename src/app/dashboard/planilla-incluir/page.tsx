@@ -50,6 +50,10 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
   let row: typeof dias = [];
   dias.forEach(d => { row.push(d); if (row.length === 7) { rows.push(row); row = []; } });
   if (row.length) rows.push(row);
+  // Meses de 28 días (ej. febrero no bisiesto) llenan exactamente 4 filas de 7
+  // columnas sin dejar fila incompleta — sin esto, Referencias/Anexo desaparece
+  // porque no hay dónde ubicarlo. Se agrega una fila extra dedicada sólo a eso.
+  if (dias.length % 7 === 0) rows.push([]);
 
   const BANDA: React.CSSProperties = {
     flexShrink: 0,
