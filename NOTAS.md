@@ -1,6 +1,111 @@
-# Notas — Planillas Incluir Salud (rama `fix/planillas-asistencia-dj07`)
+# Notas — Planillas Incluir Salud
 
 Fecha diagnóstico: 2026-07-23 (actualizado en sesión de seguimiento, mismo día)
+
+## Sesión de seguimiento — layout DJ ESC 07 (rama `fix/dj-esc107-layout`, sobre `main`)
+
+La rama `fix/planillas-asistencia-dj07` ya está mergeada a `main` (ver más abajo,
+sección original). Esta rama nueva parte de `main` y sólo toca
+`src/app/dashboard/dj-esc107/page.tsx`.
+
+### Causa raíz encontrada — bug de layout en impresión
+
+`src/app/globals.css` tiene una regla `@media print` (líneas ~1020-1044) pensada
+para varias plantillas de impresión a la vez (`.dj-page`, `.carta-page`,
+`.carta-cambio`, `.print-area`):
+
+```css
+.dj-page, .carta-page, .carta-cambio, .print-area {
+  display: block !important;
+  ...
+  overflow: visible !important;
+  padding: 12mm 16mm !important;
+  ...
+}
+```
+
+`DjPage` (dj-esc107) está armada con `display:flex; flexDirection:column` y una
+cadena de `<div style={{flex:'1 1 auto'}}/>` (algunos con peso 3) que reparten el
+espacio vertical sobrante entre las secciones — así es como el footer de logos
+queda anclado abajo y hay "aire" antes de cada firma. Esta regla global, al tener
+`!important`, **pisa el `display:flex` inline y lo fuerza a `block`** en el
+momento de imprimir (que es justo cuando se activa `@media print`). Con
+`display:block`, los divs `flex:1 1 auto` dejan de tener efecto (la propiedad
+`flex` no hace nada fuera de un contenedor flex) y colapsan a altura 0: todo el
+contenido cae apilado en el ~60% superior de la hoja (que es exactamente lo
+reportado), con el resto de los 297mm de la caja (la altura inline no se pisa)
+vacío abajo.
+
+Esto también explica por qué en pantalla (vista previa, sin imprimir) el layout
+se ve bien: la regla rota sólo vive dentro de `@media print`, así que el bug es
+invisible hasta que se imprime o exporta a PDF — coincide exactamente con lo que
+reportaste ("Comparé la vista de impresión real... contra el PDF").
+
+`overflow: visible !important` en la misma regla también reemplaza el
+`overflow:hidden` inline. Si algún beneficiario en particular generara contenido
+apenas más alto que 297mm (ej. un nombre muy largo que fuerza un salto de línea
+en su recuadro), con `overflow:visible` ese excedente se desborda visualmente en
+vez de recortarse — la hipótesis más plausible para las 2 hojas extra
+(28 para 26 beneficiarios), aunque no pude confirmarlo imprimiendo de verdad (ver
+limitación abajo).
+
+### Fix aplicado — aislado, sin tocar el CSS global compartido
+
+`globals.css` es compartido por `planilla-incluir` (misma clase `.dj-page`),
+`cambio-transporte` y `presentacion-docs` (`.carta-page`/`.carta-cambio`/
+`.print-area`). Modificar la regla global ahí arriesgaba romper esas otras
+plantillas, así que en vez de tocar `globals.css` se agregó una clase propia
+`dje107-page` sólo en este componente, con una regla de mayor especificidad
+(`.dj-page.dje107-page`) dentro del `<style>` local de la página, que restaura
+`display:flex`, `overflow:hidden` y el padding propio de la plantilla, sólo para
+esta plantilla:
+
+```css
+.dj-page.dje107-page {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding: 16mm 18mm 12mm 20mm !important;
+}
+```
+
+Al usar dos clases (mayor especificidad que la regla global de una sola clase),
+gana sin depender del orden de los `<style>` en el DOM. `planilla-incluir` y el
+resto de las plantillas que usan `.dj-page`/`.carta-page`/`.print-area` **no se
+tocaron y siguen exactamente igual**.
+
+### Otros ajustes de diseño (para acercar al PDF de referencia)
+
+- Logo header: `65pt` → `85pt` de alto (el PDF lo muestra notoriamente más
+  grande que el resto del contenido).
+- Recuadros MES/AÑO y APELLIDO Y NOMBRE/BENEFICIO Nro: más padding vertical
+  (recuadros más altos) y un indent de `10pt` respecto del margen para esos
+  campos (no para los títulos de sección/bandas, que quedan flush igual que en
+  el PDF).
+- Más aire entre Firma/Aclaración/DNI dentro de CONFORMIDAD TUTOR (`8pt` →
+  `18pt` de separación) — el espaciado grande entre banda/fecha y firma ya lo
+  daban los `flex:3` existentes, una vez restaurado el `display:flex`.
+- Spacer previo al footer de logos con más peso (`flex:1`→`flex:2`) para que
+  quede más pegado al pie de página, como en el PDF.
+- Padding general de la hoja: `14mm 15mm 10mm 20mm` → `16mm 18mm 12mm 20mm`
+  (un poco más generoso y simétrico, más parecido al PDF).
+
+### Limitación — no pude verificar imprimiendo de verdad
+
+No hay navegador headless (Chrome/Edge/Playwright/Puppeteer) disponible en este
+entorno para renderizar la página, imprimir a PDF y contar hojas realmente. La
+corrección de `display:flex`/`overflow:hidden` está verificada por lectura
+exacta de la cascada CSS (confirmé qué regla gana y con qué especificidad,
+no es una suposición visual), y el build de producción corre limpio, pero **no
+pude confirmar de forma empírica que ahora salen exactamente 26 hojas para 26
+beneficiarios, ni comparar pixel a pixel contra el PDF**. Te pido que lo
+verifiques vos imprimiendo/exportando a PDF una vez desplegado, antes de
+confiar en que quedó 100% resuelto. Si después de este fix siguen apareciendo
+páginas de más, lo más probable es que sea por overflow real de contenido en
+1-2 registros puntuales (nombres largos) más que por el bug de CSS — en ese
+caso habría que revisar esos registros específicos.
+
+---
 
 ## Estado de merge a main (chequeado con `git fetch` + `git log origin/main..origin/fix/...`)
 

@@ -43,18 +43,20 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
     printColorAdjust: 'exact',
   };
 
+  const INDENT: React.CSSProperties = { marginLeft: '10pt' };
+
   return (
-    <div className="dj-page" style={{
+    <div className="dj-page dje107-page" style={{
       width: '210mm', height: '297mm', boxSizing: 'border-box',
-      padding: '14mm 15mm 10mm 20mm',
+      padding: '16mm 18mm 12mm 20mm',
       fontFamily: 'Arial, sans-serif', fontSize: '11pt', color: '#000',
       background: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
 
       {/* LOGO IS */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <div style={{ flexShrink: 0, marginBottom: '6pt' }}>
-        <img src={LOGO_IS} alt="Incluir Salud" style={{ height: '65pt', width: 'auto', display: 'block' }} />
+      <div style={{ flexShrink: 0, marginBottom: '8pt' }}>
+        <img src={LOGO_IS} alt="Incluir Salud" style={{ height: '85pt', width: 'auto', display: 'block' }} />
       </div>
 
       {/* TITULO */}
@@ -63,14 +65,14 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
       <div style={{ flex: '1 1 auto' }} />
 
       {/* MES / AÑO */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6pt', fontSize: '11pt' }}>
+      <div style={{ ...INDENT, flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6pt', fontSize: '11pt' }}>
         <span style={{ fontWeight: 'bold', minWidth: '32pt' }}>MES:</span>
-        <span style={{ border: '1px solid #000', padding: '3pt 0', minWidth: '160pt', textAlign: 'center', fontWeight: 'bold' }}>
+        <span style={{ border: '1px solid #000', padding: '6pt 0', minWidth: '170pt', textAlign: 'center', fontWeight: 'bold' }}>
           {mesNombre}
         </span>
         <span style={{ flex: 1 }} />
         <span style={{ fontWeight: 'bold', minWidth: '24pt' }}>AÑO:</span>
-        <span style={{ border: '1px solid #000', padding: '3pt 6pt', minWidth: '40pt', textAlign: 'center' }}>
+        <span style={{ border: '1px solid #000', padding: '6pt 6pt', minWidth: '50pt', textAlign: 'center' }}>
           {anioFormateado}
         </span>
       </div>
@@ -78,14 +80,14 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
       <div style={{ flex: '1 1 auto' }} />
 
       {/* DATOS BENEFICIARIO */}
-      <div style={{ flexShrink: 0, fontWeight: 'bold', fontSize: '11pt', marginBottom: '4pt' }}>DATOS BENEFICIARIO:</div>
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'stretch', fontSize: '11pt' }}>
+      <div style={{ flexShrink: 0, fontWeight: 'bold', fontSize: '11pt', marginBottom: '6pt' }}>DATOS BENEFICIARIO:</div>
+      <div style={{ ...INDENT, flexShrink: 0, display: 'flex', alignItems: 'stretch', fontSize: '11pt', marginBottom: '6pt' }}>
         <span style={{ minWidth: '130pt', display: 'flex', alignItems: 'center' }}>APELLIDO Y NOMBRE</span>
-        <span style={{ border: '1px solid #000', flex: 1, padding: '3pt 6pt', fontWeight: 'bold' }}>{b.nombre}</span>
+        <span style={{ border: '1px solid #000', flex: 1, padding: '5pt 8pt', fontWeight: 'bold' }}>{b.nombre}</span>
       </div>
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'stretch', fontSize: '11pt' }}>
+      <div style={{ ...INDENT, flexShrink: 0, display: 'flex', alignItems: 'stretch', fontSize: '11pt' }}>
         <span style={{ minWidth: '130pt', display: 'flex', alignItems: 'center' }}>BENEFICIO Nro</span>
-        <span style={{ border: '1px solid #000', borderTop: 'none', padding: '3pt 6pt', minWidth: '185pt', fontWeight: 'bold' }}>
+        <span style={{ border: '1px solid #000', padding: '5pt 8pt', minWidth: '185pt', fontWeight: 'bold' }}>
           {b.nroAfiliado}
         </span>
         <span style={{ flex: 1 }} />
@@ -112,11 +114,11 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
       <div style={{ flex: '3 1 auto' }} />
 
       {/* FIRMA TUTOR */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-end', gap: '6pt', fontSize: '11pt', marginBottom: '8pt' }}>
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-end', gap: '6pt', fontSize: '11pt', marginBottom: '18pt' }}>
         <span style={{ minWidth: '185pt', whiteSpace: 'nowrap' }}>Firma Titular/Familiar/Responsable/Tutor</span>
         <span style={{ flex: 1, borderBottom: '1px solid #000', display: 'inline-block' }} />
       </div>
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-end', gap: '6pt', fontSize: '11pt', marginBottom: '8pt' }}>
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-end', gap: '6pt', fontSize: '11pt', marginBottom: '18pt' }}>
         <span style={{ minWidth: '70pt', whiteSpace: 'nowrap' }}>Aclaración</span>
         <span style={{ borderBottom: '1px solid #000', display: 'inline-block', minWidth: '170pt' }} />
       </div>
@@ -149,7 +151,7 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
         <span>Sello Institución</span>
       </div>
 
-      <div style={{ flex: '1 1 auto' }} />
+      <div style={{ flex: '2 1 auto' }} />
 
       {/* LOGOS FOOTER */}
       <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16pt' }}>
@@ -243,6 +245,23 @@ export default function DJEsc107Page() {
           .dj-page { page-break-after: always; }
           .dj-page:last-child { page-break-after: auto; }
           @page { size: A4 portrait; margin: 0; }
+
+          /*
+           * globals.css fuerza .dj-page a display:block + overflow:visible
+           * en @media print (pensado para plantillas tipo carta/print-area
+           * sin layout flex interno). Esta planilla depende de flex-column +
+           * overflow:hidden para distribuir el contenido en toda la hoja y
+           * evitar que se desborde a una página extra. Se restaura sólo para
+           * esta plantilla vía clase propia (mayor especificidad que
+           * globals.css), sin tocar la regla global compartida con
+           * planilla-incluir y otras plantillas (cambio-transporte, etc.).
+           */
+          .dj-page.dje107-page {
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+            padding: 16mm 18mm 12mm 20mm !important;
+          }
         }
       `}</style>
 
