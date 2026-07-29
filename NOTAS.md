@@ -2,6 +2,57 @@
 
 Fecha diagnóstico: 2026-07-23 (actualizado en sesión de seguimiento, mismo día)
 
+## Verificación — "no veo los cambios al imprimir" (rama `fix/dj-esc107-layout`)
+
+Pediste confirmar 3 cosas puntuales antes de seguir tocando código, porque
+sospechabas que los fixes de layout podían haber ido a un archivo/componente
+que la ruta `/dashboard/dj-esc107` no renderiza. Resultado: **las tres
+verificaciones dieron bien, no encontré ningún desvío.**
+
+1. **Commits en la rama y pusheados**: `git status` limpio, y
+   `git diff fix/dj-esc107-layout origin/fix/dj-esc107-layout --stat` no
+   devuelve ninguna diferencia — el local y el remoto son idénticos. Los 2
+   commits de los fixes de layout (`3dfce22` restaura flex/overflow,
+   `43e7e4f` corrige desborde a 2da hoja + líneas de firma + fecha numérica)
+   están ahí y están pusheados.
+
+2. **Los cambios están en el archivo que se ve en pantalla**: confirmado con
+   `git show origin/fix/dj-esc107-layout:src/app/dashboard/dj-esc107/page.tsx`
+   (leyendo directo el contenido del commit en origin, no un working-copy que
+   pudiera estar desactualizado):
+   - `mesStr` (fecha numérica `DD/MM/YYYY`) aparece en las líneas 34, 110 y 141.
+   - El bloque de "Firma Titular/Familiar/Responsable/Tutor" (línea 119) es
+     sólo el label — ya no tiene el `<span>` con `borderBottom` al lado que
+     tenía antes.
+   - La clase `dje107-page` está tanto en el elemento (línea 50) como en la
+     regla CSS que la restaura (línea 271).
+   - Único archivo: `src/app/dashboard/dj-esc107/page.tsx`.
+
+3. **No hay componente duplicado ni desvío de ruteo**: `src/app/dashboard/dj-esc107/`
+   sólo contiene `page.tsx` (no hay `layout.tsx` propio ni otro archivo). Un
+   grep por `DjPage`, `PLANILLA CONFORMIDAD EFECTIVA PRESTACIÓN DE TRANSPORTE`
+   y `dj107` en todo `src/` sólo encuentra el componente real en
+   `dj-esc107/page.tsx` — el resto de las coincidencias
+   (`planilla-incluir/page.tsx`, `Sidebar.tsx`, `BottomNav.tsx`,
+   `dashboard/page.tsx`) son enlaces de navegación al link `/dashboard/dj-esc107`,
+   no otra implementación del componente de impresión. `DjPage` está definida
+   dentro del mismo archivo (no se importa desde otro lado), así que no existe
+   ningún "componente viejo" o copia separada compitiendo por esa ruta.
+
+**No se tocó código en esta verificación** (según lo que pediste en el punto 5,
+al no encontrar ningún desvío).
+
+**Explicación más probable de por qué no viste los cambios**: esta rama
+(`fix/dj-esc107-layout`) **no está mergeada a `main`**. Si probaste imprimiendo
+desde una build/deploy de producción (que sólo tiene lo que hay en `main`) en
+vez de correr esta rama localmente (`git checkout fix/dj-esc107-layout` +
+`npm run dev`/`npm run build` sobre ese checkout), verías la versión vieja del
+componente aunque los fixes estén perfectamente commiteados y pusheados acá.
+También revisá que el `npm run dev` que estés mirando no haya quedado corriendo
+sobre otra rama desde antes (el hot-reload de Next no cambia de rama solo) y
+que el navegador no esté sirviendo una vista impresa desde caché/vista previa
+vieja de una pestaña abierta de antes del fix.
+
 ## Iteración — desborde a 2da hoja + líneas de firma de más + fecha con nombre de mes
 
 Después del fix de layout anterior (`display:flex` restaurado), al imprimir de
