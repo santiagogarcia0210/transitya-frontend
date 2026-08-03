@@ -50,6 +50,10 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
   let row: typeof dias = [];
   dias.forEach(d => { row.push(d); if (row.length === 7) { rows.push(row); row = []; } });
   if (row.length) rows.push(row);
+  // Meses de 28 días (ej. febrero no bisiesto) llenan exactamente 4 filas de 7
+  // columnas sin dejar fila incompleta — sin esto, Referencias/Anexo desaparece
+  // porque no hay dónde ubicarlo. Se agrega una fila extra dedicada sólo a eso.
+  if (dias.length % 7 === 0) rows.push([]);
 
   const BANDA: React.CSSProperties = {
     flexShrink: 0,
@@ -67,7 +71,7 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
     WebkitPrintColorAdjust: 'exact',
     printColorAdjust: 'exact',
     width: '14.28%',
-    height: '52pt',
+    height: '55pt',
   };
 
   const DATO: React.CSSProperties = {
@@ -85,7 +89,7 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
 
   const SIG_VAL: React.CSSProperties = {
     display: 'flex', alignItems: 'flex-end',
-    minHeight: '24pt', fontSize: '9pt',
+    minHeight: '32pt', fontSize: '9pt',
   };
 
   const SIG_LBL: React.CSSProperties = {
@@ -94,9 +98,9 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
   };
 
   return (
-    <div className="dj-page" style={{
+    <div className="dj-page planilla-incluir-page" style={{
       width: '210mm', height: '297mm', boxSizing: 'border-box',
-      padding: '10mm 14mm 8mm 16mm',
+      padding: '10mm 12mm 8mm 14mm',
       fontFamily: 'Arial, sans-serif', fontSize: '10pt', color: '#000',
       background: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden',
     }}>
@@ -161,20 +165,35 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
                     </div>
                   </td>
                 ))}
-                {/* Últimas celdas con Referencias y Anexo */}
+                {/* Referencias / Anexo — 4 celdas separadas, igual al original:
+                    Referencias | Presenta Anexo (header) | NO/SI apilado | Cantidad de Hojas */}
                 {isLast && remaining > 0 && (() => {
-                  const refCols = Math.ceil(remaining / 2);
-                  const aneCols = Math.floor(remaining / 2);
+                  const infoTd: React.CSSProperties = {
+                    border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top',
+                    height: '55pt', fontSize: '7.5pt', lineHeight: 1.35,
+                  };
+                  // remaining >= 4 siempre (4 para 31 días, 7 para la fila extra de 28 días).
+                  // El excedente sobre el mínimo de 1 columna por celda se lo lleva primero
+                  // Referencias (tiene el texto más largo) y luego Presenta Anexo.
+                  const extra      = remaining - 4;
+                  const refCols    = 1 + Math.min(extra, 2);
+                  const anexoCols  = 1 + Math.max(0, extra - 2);
+                  const noSiCols   = 1;
+                  const hojasCols  = remaining - refCols - anexoCols - noSiCols;
                   return (
                     <>
-                      <td colSpan={refCols} style={{ border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top', height: '52pt', fontSize: '7.5pt', lineHeight: 1.35 }}>
+                      <td colSpan={refCols} style={infoTd}>
                         <strong>Referencias:</strong><br />X = Asistencia normal<br />A = Ausente<br />AP = Ausencia prolongada<br />E = Enfermedad<br />F = Feriado
                       </td>
-                      {aneCols > 0 && (
-                        <td colSpan={aneCols} style={{ border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top', height: '52pt', fontSize: '7.5pt', lineHeight: 1.6 }}>
-                          <strong>Presenta Anexo (Observaciones):</strong><br />NO&nbsp;&nbsp;☐&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SI&nbsp;&nbsp;☐<br />Cantidad de Hojas: ________
-                        </td>
-                      )}
+                      <td colSpan={anexoCols} style={{ ...infoTd, lineHeight: 1.5 }}>
+                        <strong>Presenta Anexo<br />(Observaciones):</strong>
+                      </td>
+                      <td colSpan={noSiCols} style={{ ...infoTd, lineHeight: 1.6 }}>
+                        NO&nbsp;☐<br />SI&nbsp;☐
+                      </td>
+                      <td colSpan={hojasCols} style={{ ...infoTd, lineHeight: 1.5 }}>
+                        Cantidad de<br />Hojas: ____
+                      </td>
                     </>
                   );
                 })()}
@@ -229,14 +248,16 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
         </div>
       </div>
 
-      {/* LOGOS FOOTER */}
-      <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14pt' }}>
+      {/* LOGOS FOOTER — Incluir Salud destacado a la izquierda, resto distribuido a lo ancho */}
+      <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={LOGO_IS_COLOR} alt="Incluir Salud" style={{ height: '32pt', width: 'auto' }} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={LOGO_ANDIS} alt="ANDIS" style={{ height: '32pt', width: 'auto' }} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={LOGO_GOB} alt="Gobierno de Tucumán" style={{ height: '32pt', width: 'auto' }} />
+        <img src={LOGO_IS_COLOR} alt="Incluir Salud" style={{ height: '38pt', width: 'auto' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14pt' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={LOGO_ANDIS} alt="ANDIS" style={{ height: '32pt', width: 'auto' }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={LOGO_GOB} alt="Gobierno de Tucumán" style={{ height: '32pt', width: 'auto' }} />
+        </div>
       </div>
     </div>
   );
@@ -305,10 +326,63 @@ export default function PlanillaIncluirPage() {
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { margin: 0; background: #fff !important; }
+          html, body { margin: 0; background: #fff !important; }
           .dj-page { page-break-after: always; }
           .dj-page:last-child { page-break-after: auto; }
-          @page { size: A4 portrait; margin: 0; }
+
+          /*
+           * FlowFieldBackground (fondo animado del dashboard, montado por
+           * DashboardLayout) es un <div position:absolute inset:0> con
+           * canvas oscuro y sin className propio — ningún selector global
+           * de @media print lo alcanza (sólo cubren aside/nav/header/footer/
+           * [class*=sidebar] etc.), así que quedaba pintándose detrás de la
+           * hoja y se veía como bandas negras en los bordes del PDF. Se
+           * oculta acá (selector estructural: hijo directo de
+           * .dashboard-layout marcado aria-hidden, que es exactamente lo que
+           * FlowFieldBackground renderiza) sin tocar DashboardLayout ni
+           * globals.css — esta regla sólo existe mientras esta página está
+           * montada, así que no afecta a ninguna otra pantalla del dashboard.
+           */
+          .dashboard-layout > div[aria-hidden="true"] { display: none !important; }
+
+          /*
+           * margin:0 depende de que el driver de impresión lo respete —
+           * varios (ej. "Microsoft Print to PDF" en Windows) imponen su
+           * propio margen mínimo igual, lo que desborda el contenido
+           * calculado para 297mm completos a una segunda hoja. Se declara
+           * un margen explícito que el driver va a respetar sin recortar
+           * nada por su cuenta (mismo criterio aplicado en dj-esc107).
+           */
+          @page { size: A4 portrait; margin: 10mm; }
+
+          /*
+           * globals.css fuerza .dj-page a display:block + overflow:visible
+           * en @media print (regla compartida con dj-esc107, cambio-transporte
+           * y presentacion-docs). Esta plantilla depende de flex-column +
+           * overflow:hidden para repartir el espacio vertical entre la
+           * grilla, las firmas y el footer. Se restaura sólo para esta
+           * plantilla vía clase propia (mayor especificidad que globals.css),
+           * sin tocar la regla global ni afectar a las otras plantillas.
+           *
+           * Altura de la caja: 265mm, NO 277mm (297 - 2x10mm de @page). El
+           * margen declarado en @page es sólo un pedido — medido en el
+           * preview real de Chrome, el margen efectivo terminó siendo
+           * ~16mm arriba/abajo (área imprimible real ≈265mm, no 277mm).
+           * overflow:hidden protege el CONTENIDO de la caja de desbordarla,
+           * pero no evita que la CAJA MISMA (altura fija en mm) sea más
+           * alta que el área imprimible real — por eso salían 27 hojas para
+           * 26 beneficiarios aunque nada individual desbordara. Se ajusta la
+           * altura de la caja al peor caso medido.
+           */
+          .dj-page.planilla-incluir-page {
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+            width: 190mm !important;
+            height: 265mm !important;
+            max-height: 265mm !important;
+            padding: 10mm 12mm 8mm 14mm !important;
+          }
         }
       `}</style>
 
