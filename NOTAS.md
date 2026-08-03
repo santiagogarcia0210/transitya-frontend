@@ -2,6 +2,66 @@
 
 Fecha diagnóstico: 2026-07-23 (actualizado en sesión de seguimiento, mismo día)
 
+## Iteración — bandas negras de fondo + desborde real con márgenes de Chrome (dj-esc107)
+
+Imprimiste de verdad (Guardar como PDF en Chrome) y aparecieron dos síntomas
+nuevos. Los dos tenían causa concreta y verificable, no eran suposiciones:
+
+**Síntoma 1 — fondo oscuro de la app visible (bandas negras en los bordes).**
+Causa: `DashboardLayout` (`src/app/dashboard/layout.tsx`) monta
+`<FlowFieldBackground intensity="subtle" />` — un `<div>` con
+`position:absolute; inset:0` que pinta un `<canvas>` oscuro (`#0a0f1e`) de
+partículas animadas, **sin ninguna className propia** (se llama sin pasarle
+`className`, así que renderiza con `className=""`). Los selectores globales
+de `@media print` en `globals.css` sólo ocultan `aside, nav, header, footer,
+.no-print, [class*="sidebar"|"topbar"|"header"]` — ninguno matchea un div sin
+clase, así que este fondo nunca se ocultaba y se imprimía detrás de la hoja
+blanca de la planilla. `Sidebar` (`<aside className="dashboard-sidebar">`) y
+`BottomNav` (`<nav className="bnav">`) sí están cubiertos por esos selectores
+— no eran el problema.
+
+Fix (aislado a esta plantilla, sin tocar `DashboardLayout` ni `globals.css`):
+```css
+.dashboard-layout > div[aria-hidden="true"] { display: none !important; }
+```
+Selector estructural (hijo directo de `.dashboard-layout` con
+`aria-hidden="true"`) que apunta exactamente al div que renderiza
+`FlowFieldBackground` — es el único hijo directo con ese atributo. Como esta
+regla vive en el `<style>` propio de la página (igual que el resto de los
+fixes de impresión), sólo existe mientras `dj-esc107` está montado: no afecta
+a ninguna otra pantalla del dashboard.
+
+**Síntoma 2 — desborde real por margen de Chrome más grande que el declarado.**
+`@page { margin: 10mm }` es un *pedido* al motor de impresión, no una
+garantía — mediste en el preview real de Chrome un margen efectivo de
+~16mm arriba/abajo, no los 10mm declarados. El problema no es que
+`overflow:hidden` no funcione: `overflow:hidden` protege el **contenido** de
+la caja de desbordar la caja, pero no evita que la **caja misma** (declarada
+en mm, unidad física fija) sea más alta que el área imprimible real de la
+página — si la caja mide 277mm y la página imprimible real mide 265mm, los
+últimos 12mm de la caja (justo donde cae el footer) se van a una segunda
+hoja sin que nada individual haya desbordado nada.
+
+Fix: `height`/`max-height` de `.dje107-page` en impresión, `277mm → 265mm`
+(peor caso: `297mm - 2×16mm`). Con la caja ajustada al área real, el
+`flex-grow` de los spacers vuelve a repartir el contenido dentro de esos
+265mm reales, sin que nada se corra a página 2.
+
+**Presupuesto de altura recalculado** (dj-esc107, verificado por lectura de
+CSS, sigue sin poder confirmarse imprimiendo de verdad en este entorno):
+caja 265mm − padding (12mm+10mm=22mm) = 243mm de área de contenido. Elementos
+fijos (logo 68pt, bandas, MES/AÑO, DATOS BENEFICIARIO, texto conformidad,
+fechas, labels de firma, Aclaración/DNI, footer) suman ≈159mm — deja ≈84mm de
+margen repartido entre los spacers flexibles (11 unidades de peso, ≈7.6mm por
+unidad). Con casi el mismo colchón que antes de este ajuste (~96mm con la
+caja vieja de 277mm), no hizo falta achicar más contenido acá — el ajuste de
+altura de la caja alcanza.
+
+No se unificaron `fix/dj-esc107-layout` y `fix/planilla-incluir-layout` en una
+sola rama — se mantuvieron separadas (mismo criterio aplicado a cada una,
+mismo tipo de fix) para no complicar el merge de lo que ya estaba pusheado en
+cada una por separado.
+
 ## Verificación — "no veo los cambios al imprimir" (rama `fix/dj-esc107-layout`)
 
 Pediste confirmar 3 cosas puntuales antes de seguir tocando código, porque

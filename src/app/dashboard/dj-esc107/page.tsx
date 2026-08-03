@@ -241,9 +241,24 @@ export default function DJEsc107Page() {
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { margin: 0; background: #fff !important; }
+          html, body { margin: 0; background: #fff !important; }
           .dj-page { page-break-after: always; }
           .dj-page:last-child { page-break-after: auto; }
+
+          /*
+           * FlowFieldBackground (fondo animado del dashboard, montado por
+           * DashboardLayout) es un <div position:absolute inset:0> con
+           * canvas oscuro y sin className propio — ningún selector global
+           * de @media print lo alcanza (sólo cubren aside/nav/header/footer/
+           * [class*=sidebar] etc.), así que quedaba pintándose detrás de la
+           * hoja y se veía como bandas negras en los bordes del PDF. Se
+           * oculta acá (selector estructural: hijo directo de
+           * .dashboard-layout marcado aria-hidden, que es exactamente lo que
+           * FlowFieldBackground renderiza) sin tocar DashboardLayout ni
+           * globals.css — esta regla sólo existe mientras esta página está
+           * montada, así que no afecta a ninguna otra pantalla del dashboard.
+           */
+          .dashboard-layout > div[aria-hidden="true"] { display: none !important; }
 
           /*
            * margin:0 dependía de que el navegador/driver de impresión respete
@@ -252,9 +267,7 @@ export default function DJEsc107Page() {
            * "gratis" hacía que el contenido (calculado para 297mm completos)
            * se desbordara a una segunda hoja y el logo del header apareciera
            * cortado arriba. Se declara un margen explícito de 10mm que el
-           * driver va a respetar sin recortar nada por su cuenta, y la caja
-           * de la plantilla se dimensiona al área imprimible resultante
-           * (190mm x 277mm) en vez de a la hoja A4 completa.
+           * driver va a respetar sin recortar nada por su cuenta.
            */
           @page { size: A4 portrait; margin: 10mm; }
 
@@ -267,14 +280,24 @@ export default function DJEsc107Page() {
            * esta plantilla vía clase propia (mayor especificidad que
            * globals.css), sin tocar la regla global compartida con
            * planilla-incluir y otras plantillas (cambio-transporte, etc.).
+           *
+           * Altura de la caja: 265mm, NO 277mm (297 - 2×10mm de @page). El
+           * margen declarado en @page es sólo un pedido — medido en el
+           * preview real de Chrome, el margen efectivo terminó siendo
+           * ~16mm arriba/abajo (área imprimible real ≈265mm, no 277mm). El
+           * overflow:hidden de esta regla protege el CONTENIDO de la caja,
+           * pero no evita que la CAJA MISMA se desborde de página si se le
+           * declara una altura mayor que el área imprimible real — por eso
+           * el footer terminaba en una segunda hoja aunque nada individual
+           * desbordara. Se ajusta la altura de la caja al peor caso medido.
            */
           .dj-page.dje107-page {
             display: flex !important;
             flex-direction: column !important;
             overflow: hidden !important;
             width: 190mm !important;
-            height: 277mm !important;
-            max-height: 277mm !important;
+            height: 265mm !important;
+            max-height: 265mm !important;
             padding: 12mm 14mm 10mm 16mm !important;
           }
         }
