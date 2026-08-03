@@ -71,7 +71,7 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
     WebkitPrintColorAdjust: 'exact',
     printColorAdjust: 'exact',
     width: '14.28%',
-    height: '58pt',
+    height: '55pt',
   };
 
   const DATO: React.CSSProperties = {
@@ -89,7 +89,7 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
 
   const SIG_VAL: React.CSSProperties = {
     display: 'flex', alignItems: 'flex-end',
-    minHeight: '38pt', fontSize: '9pt',
+    minHeight: '32pt', fontSize: '9pt',
   };
 
   const SIG_LBL: React.CSSProperties = {
@@ -170,7 +170,7 @@ function PlanillaIncluir({ nombre, nroAfiliado, mes, anio }: {
                 {isLast && remaining > 0 && (() => {
                   const infoTd: React.CSSProperties = {
                     border: '1px solid #000', padding: '3pt 5pt', verticalAlign: 'top',
-                    height: '58pt', fontSize: '7.5pt', lineHeight: 1.35,
+                    height: '55pt', fontSize: '7.5pt', lineHeight: 1.35,
                   };
                   // remaining >= 4 siempre (4 para 31 días, 7 para la fila extra de 28 días).
                   // El excedente sobre el mínimo de 1 columna por celda se lo lleva primero
@@ -326,9 +326,24 @@ export default function PlanillaIncluirPage() {
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { margin: 0; background: #fff !important; }
+          html, body { margin: 0; background: #fff !important; }
           .dj-page { page-break-after: always; }
           .dj-page:last-child { page-break-after: auto; }
+
+          /*
+           * FlowFieldBackground (fondo animado del dashboard, montado por
+           * DashboardLayout) es un <div position:absolute inset:0> con
+           * canvas oscuro y sin className propio — ningún selector global
+           * de @media print lo alcanza (sólo cubren aside/nav/header/footer/
+           * [class*=sidebar] etc.), así que quedaba pintándose detrás de la
+           * hoja y se veía como bandas negras en los bordes del PDF. Se
+           * oculta acá (selector estructural: hijo directo de
+           * .dashboard-layout marcado aria-hidden, que es exactamente lo que
+           * FlowFieldBackground renderiza) sin tocar DashboardLayout ni
+           * globals.css — esta regla sólo existe mientras esta página está
+           * montada, así que no afecta a ninguna otra pantalla del dashboard.
+           */
+          .dashboard-layout > div[aria-hidden="true"] { display: none !important; }
 
           /*
            * margin:0 depende de que el driver de impresión lo respete —
@@ -348,14 +363,24 @@ export default function PlanillaIncluirPage() {
            * grilla, las firmas y el footer. Se restaura sólo para esta
            * plantilla vía clase propia (mayor especificidad que globals.css),
            * sin tocar la regla global ni afectar a las otras plantillas.
+           *
+           * Altura de la caja: 265mm, NO 277mm (297 - 2x10mm de @page). El
+           * margen declarado en @page es sólo un pedido — medido en el
+           * preview real de Chrome, el margen efectivo terminó siendo
+           * ~16mm arriba/abajo (área imprimible real ≈265mm, no 277mm).
+           * overflow:hidden protege el CONTENIDO de la caja de desbordarla,
+           * pero no evita que la CAJA MISMA (altura fija en mm) sea más
+           * alta que el área imprimible real — por eso salían 27 hojas para
+           * 26 beneficiarios aunque nada individual desbordara. Se ajusta la
+           * altura de la caja al peor caso medido.
            */
           .dj-page.planilla-incluir-page {
             display: flex !important;
             flex-direction: column !important;
             overflow: hidden !important;
             width: 190mm !important;
-            height: 277mm !important;
-            max-height: 277mm !important;
+            height: 265mm !important;
+            max-height: 265mm !important;
             padding: 10mm 12mm 8mm 14mm !important;
           }
         }

@@ -2,6 +2,52 @@
 
 Fecha diagnóstico: 2026-07-23 (actualizado en sesión de seguimiento, mismo día)
 
+## Iteración — bandas negras de fondo + desborde real con márgenes de Chrome (planilla-incluir)
+
+Mismo par de síntomas reportados en `dj-esc107` al imprimir de verdad
+(Guardar como PDF en Chrome), y esta plantilla comparte exactamente la misma
+causa raíz en ambos casos — se aplicó el mismo criterio de fix a las dos:
+
+**Síntoma 1 — fondo oscuro visible.** Igual que en `dj-esc107`:
+`FlowFieldBackground` (montado por `DashboardLayout`, ver detalle completo en
+la sección de `dj-esc107` más abajo) es un `<div position:absolute inset:0>`
+con canvas oscuro sin className propio, invisible para los selectores
+globales de `@media print`. Mismo fix aislado, sin tocar `DashboardLayout` ni
+`globals.css`:
+```css
+.dashboard-layout > div[aria-hidden="true"] { display: none !important; }
+```
+
+**Síntoma 2 — 27 hojas en vez de 26.** Mismo mecanismo que en `dj-esc107`:
+`@page margin:10mm` es un pedido, el margen real medido en Chrome fue ~16mm
+arriba/abajo. La caja `.planilla-incluir-page` declaraba `height:277mm`
+(asumiendo área imprimible de 297-2×10mm), pero el área real es
+297-2×16mm=265mm — los 12mm de diferencia (justo donde caía el footer)
+empujaban 1 beneficiario de cada tanda a una hoja extra. Fix: `height`/
+`max-height` de la caja en impresión `277mm → 265mm`.
+
+A diferencia de `dj-esc107` (que tenía ~96mm de colchón y no necesitó tocar
+contenido), esta plantilla venía más ajustada (~20mm de colchón con la caja
+vieja de 277mm) — con la caja más chica (265mm) ese colchón bajaba a ~8mm,
+insuficiente dado el margen de error de mis estimaciones de métricas de
+fuente. Se recortó un poco más para tener margen real:
+- Filas de la grilla: `58pt → 55pt` (tabla completa: 5 filas × 55pt + 6pt
+  margin ≈ 99.2mm en vez de ≈104.4mm).
+- Cajas de firma: `minHeight` de `SIG_VAL` `38pt → 32pt` (sigue siendo mucho
+  más alto que el `24pt` original — espacio real para firmar — pero ya no al
+  límite).
+
+**Presupuesto de altura recalculado**: caja 265mm − padding (10mm+8mm=18mm)
+= 247mm de área de contenido. Elementos fijos (logo, banda, subtítulo,
+datos, grilla, firmas, footer) suman ≈228mm — deja ≈19mm de margen para el
+único spacer flexible (entre la grilla y las firmas), similar al colchón que
+había antes de este ajuste con la caja vieja de 277mm. Sigue sin poder
+confirmarse imprimiendo de verdad en este entorno (sin navegador headless).
+
+No se unificaron `fix/dj-esc107-layout` y `fix/planilla-incluir-layout` en
+una sola rama — se mantuvieron separadas (mismo criterio aplicado a cada una)
+para no complicar el merge de lo que ya estaba pusheado en cada una.
+
 ## Sesión de seguimiento — layout planilla-incluir (rama `fix/planilla-incluir-layout`, sobre `main`)
 
 Después de arreglar el layout de impresión de dj-esc107 (rama separada
