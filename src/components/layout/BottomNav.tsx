@@ -20,6 +20,7 @@ import {
   IconChecklist,
   IconFolders,
   IconMail,
+  IconListDetails,
 } from '@tabler/icons-react';
 import type { Icon } from '@tabler/icons-react';
 import { CHOFER_HREFS } from '@/lib/navAccess';
@@ -33,6 +34,7 @@ const ITEMS: NavItem[] = [
   { href: '/dashboard',                    label: 'Inicio',          Icon: IconHome },
   { href: '/dashboard/panel-admin',        label: 'Panel admin',     Icon: IconChecklist },
   { href: '/dashboard/legajos',            label: 'Carpetas',        Icon: IconFolders },
+  { href: '/dashboard/requisitos-os',      label: 'Requisitos OS',   Icon: IconListDetails },
   { href: '/dashboard/correo',             label: 'Correo',          Icon: IconMail },
   { href: '/dashboard/planilla-incluir',   label: 'Planilla',        Icon: IconClipboardList },
   { href: '/dashboard/dj-esc107',          label: 'DJ ESC 107',      Icon: IconFileDescription },
