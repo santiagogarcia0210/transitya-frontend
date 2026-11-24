@@ -17,6 +17,8 @@ import {
   IconCalendarStats,
   IconSettings,
   IconMapPin,
+  IconChecklist,
+  IconFolders,
 } from '@tabler/icons-react';
 import type { Icon } from '@tabler/icons-react';
 import { CHOFER_HREFS } from '@/lib/navAccess';
@@ -28,6 +30,8 @@ type NavItem = { href: string; label: string; Icon: Icon };
 // mi-ruta está aquí aunque no aparezca para admin — CHOFER_HREFS lo incluye.
 const ITEMS: NavItem[] = [
   { href: '/dashboard',                    label: 'Inicio',          Icon: IconHome },
+  { href: '/dashboard/panel-admin',        label: 'Panel admin',     Icon: IconChecklist },
+  { href: '/dashboard/legajos',            label: 'Carpetas',        Icon: IconFolders },
   { href: '/dashboard/planilla-incluir',   label: 'Planilla',        Icon: IconClipboardList },
   { href: '/dashboard/dj-esc107',          label: 'DJ ESC 107',      Icon: IconFileDescription },
   { href: '/dashboard/cambio-transporte',  label: 'Cambio Transp.',  Icon: IconArrowsTransferUp },

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import { parseFecha, dmyAIso } from '@/lib/administrativo';
 
 const TIPOS = ['Seguro', 'VTV', 'Licencia', 'Otro'];
 
@@ -15,10 +16,11 @@ interface Vencimiento {
 }
 
 function calcularInfo(fechaStr: string, diasAviso = 30): { estado: EstadoVenc; dias: number } {
-  if (!fechaStr) return { estado: 'VIGENTE', dias: 999 };
-  const fecha = new Date(fechaStr);
-  if (isNaN(fecha.getTime())) return { estado: 'VIGENTE', dias: 999 };
-  const dias = Math.round((fecha.getTime() - Date.now()) / 86400000);
+  // El backend guarda dd/MM/yyyy; new Date('25/12/2026') es inválido → se parsea a mano.
+  const fecha = parseFecha(fechaStr);
+  if (!fecha) return { estado: 'VIGENTE', dias: 999 };
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const dias = Math.round((fecha.getTime() - hoy.getTime()) / 86400000);
   if (dias < 0) return { estado: 'VENCIDO', dias };
   if (dias <= diasAviso) return { estado: 'PROXIMO', dias };
   return { estado: 'VIGENTE', dias };
@@ -67,7 +69,9 @@ export default function VencimientosPage() {
     setLoading(true);
     try {
       const r = await api.get('/api/vencimientos');
-      const datos = toArray(r.data).map(serializarFirestore).map(normalizar);
+      // El backend responde { ok, vencimientos: [...] } — toArray no conoce esa clave.
+      const crudos: Record<string, unknown>[] = Array.isArray(r.data?.vencimientos) ? r.data.vencimientos : toArray(r.data);
+      const datos = crudos.map(serializarFirestore).map(normalizar);
       // Ordenar siempre por días restantes ascendente
       datos.sort((a, b) => a.diasRestantes - b.diasRestantes);
       setLista(datos);
@@ -103,7 +107,7 @@ export default function VencimientosPage() {
   const abrirNuevo = () => { setForm(EMPTY); setMsg(null); setShowModal(true); };
   const abrirEdicion = (v: Vencimiento) => {
     setForm({ id:v.id, descripcion:v.descripcion, persona:v.persona||v.chofer,
-      fechaVencimiento:v.fechaVencimiento, tipo:v.tipo, diasAviso:String(v.diasAviso), notas:v.notas });
+      fechaVencimiento:dmyAIso(v.fechaVencimiento), tipo:v.tipo, diasAviso:String(v.diasAviso), notas:v.notas });
     setMsg(null); setShowModal(true);
   };
   const cerrar = () => { setShowModal(false); setMsg(null); };

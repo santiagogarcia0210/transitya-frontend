@@ -16,7 +16,7 @@ import {
   IconCalendarStats, IconSettings, IconFileDescription,
   IconArrowsTransferUp, IconFolderOpen, IconCreditCard,
   IconPackage, IconBike, IconMap, IconSearch, IconCar,
-  IconMapPin, IconBuilding, IconLogout,
+  IconMapPin, IconBuilding, IconLogout, IconChecklist, IconFolders, IconListDetails,
   type Icon,
 } from '@tabler/icons-react';
 
@@ -39,6 +39,9 @@ const UNIVERSAL: LinkItem[] = [
 ];
 
 const ESCOLAR_EXTRAS: LinkItem[] = [
+  { href: '/dashboard/panel-admin',        label: 'Panel administrativo', icon: IconChecklist },
+  { href: '/dashboard/legajos',            label: 'Carpeta pacientes',  icon: IconFolders },
+  { href: '/dashboard/requisitos-os',      label: 'Requisitos OS',      icon: IconListDetails },
   { href: '/dashboard/planilla-incluir',   label: 'Planilla Incluir',   icon: IconClipboardCheck },
   { href: '/dashboard/dj-esc107',          label: 'DJ — ESC 107',       icon: IconFileDescription },
   { href: '/dashboard/cambio-transporte',  label: 'Cambio Transporte',  icon: IconArrowsTransferUp },
