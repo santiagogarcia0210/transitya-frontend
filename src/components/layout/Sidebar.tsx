@@ -16,7 +16,7 @@ import {
   IconCalendarStats, IconSettings, IconFileDescription,
   IconArrowsTransferUp, IconFolderOpen, IconCreditCard,
   IconPackage, IconBike, IconMap, IconSearch, IconCar,
-  IconMapPin, IconBuilding, IconLogout, IconChecklist, IconFolders, IconListDetails,
+  IconMapPin, IconBuilding, IconLogout, IconChecklist, IconFolders, IconListDetails, IconMail,
   type Icon,
 } from '@tabler/icons-react';
 
@@ -35,6 +35,7 @@ const UNIVERSAL: LinkItem[] = [
   { href: '/dashboard/remitos',       label: 'Remitos',       icon: IconReceipt },
   { href: '/dashboard/reportes-km',   label: 'Reportes KM',   icon: IconChartBar },
   { href: '/dashboard/vencimientos',  label: 'Vencimientos',  icon: IconCalendarStats },
+  { href: '/dashboard/correo',        label: 'Correo',        icon: IconMail },
   { href: '/dashboard/administrador', label: 'Administrador', icon: IconSettings },
 ];
 

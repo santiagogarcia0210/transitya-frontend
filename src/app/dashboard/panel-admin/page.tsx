@@ -15,8 +15,10 @@ interface AlertaDoc {
   detalle: string; fechaVenc?: string; diffDias: number | null;
 }
 interface VencFlota { id: string; descripcion: string; persona: string; tipo: string; fechaVenc: string; estado: string; diffDias: number }
+interface MailDestacado { id: string; asunto: string; deNombre: string; resumen: string; accion: string; urgencia: string; pacienteNombre: string }
 interface Panel {
   tareas: Ocurrencia[]; docsPacientes: AlertaDoc[]; vencimientos: VencFlota[];
+  correo?: { conectado: boolean; error: string; nuevos: number; conAccion: number; destacados: MailDestacado[] };
   resumen: { urgentes: number; tareasPendientes: number; tareasHechas: number; carpetasCompletas: number; carpetasTotal: number };
   hayTareas: boolean; hayRequisitos: boolean;
 }
@@ -166,6 +168,36 @@ export default function PanelAdminPage() {
                 </div>
               );
             })}
+          </Seccion>
+
+          <Seccion titulo="Correo de trabajo"
+            accion={<Link className="btn btn-secondary" style={{ fontSize: '.75rem' }} href="/dashboard/correo">Abrir correo →</Link>}>
+            {!panel.correo?.conectado ? (
+              <p style={{ fontSize: '.82rem', color: 'var(--text2)' }}>
+                <Link href="/dashboard/correo" style={{ color: 'var(--amber)', fontWeight: 600 }}>Conectá el mail de la empresa</Link> para ver acá lo que piden las obras sociales, las familias y el contador.
+              </p>
+            ) : panel.correo.error ? (
+              <p style={{ fontSize: '.82rem', color: 'var(--red)' }}>No se pudo leer el correo: {panel.correo.error}</p>
+            ) : panel.correo.destacados.length === 0 ? (
+              <p style={{ fontSize: '.82rem', color: 'var(--green)' }}>✓ Nada pendiente en el correo{panel.correo.nuevos ? ` · ${panel.correo.nuevos} sin leer` : ''}.</p>
+            ) : (
+              <>
+                <p style={{ fontSize: '.76rem', color: 'var(--text3)', marginBottom: '.3rem' }}>
+                  {panel.correo.conAccion} para resolver · {panel.correo.nuevos} sin leer
+                </p>
+                {panel.correo.destacados.map(m => (
+                  <div key={m.id} style={{ display: 'flex', gap: '.75rem', alignItems: 'center', padding: '.5rem 0', borderBottom: '1px solid var(--border)' }}>
+                    <span className={`badge ${m.urgencia === 'ALTA' ? 'badge-red' : m.urgencia === 'MEDIA' ? 'badge-amber' : 'badge-gray'}`} style={{ minWidth: 86, textAlign: 'center', flexShrink: 0 }}>
+                      {m.urgencia === 'ALTA' ? 'Urgente' : m.urgencia === 'MEDIA' ? 'Media' : 'Normal'}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '.84rem', color: 'var(--text)' }}><b>{m.asunto}</b> · {m.deNombre}</p>
+                      <p style={{ fontSize: '.72rem', color: 'var(--text3)' }}>{m.accion || m.resumen}{m.pacienteNombre && <> · {m.pacienteNombre}</>}</p>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </Seccion>
 
           <Seccion titulo="Documentos de pacientes"
