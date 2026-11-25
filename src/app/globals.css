@@ -622,16 +622,6 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
   .egresos-table { display: block; overflow-x: auto; white-space: nowrap; }
   .btn-row { flex-direction: column; }
   .btn-row .btn { width: 100%; }
-  .saldo-grid { grid-template-columns: 1fr !important; }
-}
-
-/* Saldo + movimientos responsive 2-col */
-.saldo-grid {
-  display: grid;
-  grid-template-columns: minmax(200px,1fr) minmax(280px,2fr);
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  align-items: start;
 }
 
 /* ── Logo border beam ── */
@@ -1170,43 +1160,233 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
 }
 @media (prefers-reduced-motion: reduce) { .mapa-inicio { transition: none; } }
 
-/* ── Pizarra del Inicio (solo admin) ───────────────────────────────────────
-   Una tarjeta con una columna por tema. En el celular las columnas se apilan
-   (la grilla baja a 1 columna sola por el minmax). El color de urgencia va en
-   los badges: rojo = vencido / ya pasó, ámbar = próximo / pendiente. */
-.pizarra { padding: 1rem; margin-bottom: 1.5rem; }
-.pizarra-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
-.pizarra-titulo { font-size: 1rem; font-weight: 700; color: var(--text); }
-.pizarra-resumen { font-size: .85rem; color: var(--text2); margin-top: .15rem; }
-.pizarra-resumen strong { font-weight: 700; }
-.pizarra-resumen .pz-rojo { color: var(--red); }
-.pizarra-resumen .pz-ambar { color: var(--amber); }
-.pizarra-resumen .pz-verde { color: var(--green); }
-.pizarra-acciones { display: flex; align-items: center; gap: .75rem; }
-.pizarra-hora { font-size: .72rem; color: var(--text3); }
-.pizarra-aviso { font-size: .8rem; color: var(--amber); margin-bottom: .75rem; }
-.pizarra-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: .75rem; align-items: start; }
-.pizarra-col { background: var(--bg4); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: .75rem; min-width: 0; }
-.pizarra-col-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
-.pizarra-col-titulo { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); }
-.pizarra-sub { font-size: .75rem; font-weight: 600; color: var(--text2); margin: .6rem 0 .25rem; }
-.pizarra-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .25rem; }
-.pizarra-item { display: flex; align-items: center; gap: .5rem; min-height: 44px; padding: .35rem .5rem; border-radius: var(--radius); background: var(--bg3); }
-.pizarra-item-main { flex: 1; min-width: 0; }
-.pizarra-item-titulo { font-size: .85rem; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pizarra-item-sub { font-size: .72rem; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pizarra-item .badge { flex-shrink: 0; }
-.pizarra-mas { font-size: .75rem; color: var(--text3); padding: .35rem .5rem 0; }
-.pizarra-vacio { font-size: .85rem; color: var(--green); padding: .6rem .25rem; }
-.pizarra-error { font-size: .82rem; color: var(--text2); padding: .5rem .25rem; }
-.pizarra-banner { font-size: .78rem; color: var(--amber); background: var(--amber-dim); border-radius: var(--radius); padding: .4rem .6rem; margin-bottom: .5rem; }
-.pizarra-banner.pz-rojo { color: var(--red); background: var(--red-dim); }
-.pizarra-pie { display: flex; flex-wrap: wrap; gap: 0 1rem; margin-top: .4rem; }
-.pizarra-link { display: inline-flex; align-items: center; min-height: 44px; font-size: .8rem; font-weight: 600; color: var(--blue-bright); text-decoration: none; }
-.pizarra-link:hover { text-decoration: underline; }
-.pizarra-check { flex-shrink: 0; width: 44px; height: 44px; margin: -.35rem -.25rem -.35rem -.5rem; display: inline-flex; align-items: center; justify-content: center; background: none; border: 0; cursor: pointer; border-radius: var(--radius); }
-.pizarra-check span { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border2); display: inline-flex; align-items: center; justify-content: center; color: transparent; transition: background-color .15s, border-color .15s, color .15s; }
-.pizarra-check:hover span, .pizarra-check:focus-visible span { background: var(--green-dim); border-color: var(--green); color: var(--green); }
-.pizarra-check:disabled { cursor: default; opacity: .6; }
-.pizarra-cargando { display: flex; align-items: center; gap: .75rem; color: var(--text3); font-size: .85rem; padding: .5rem 0; }
-@media (prefers-reduced-motion: reduce) { .pizarra-check span { transition: none; } }
+/* ═══════════════════════════════════════════════════════════════════════
+   BARRA DE DATOS DEL INICIO
+   Una sola franja de ancho completo: un segmento por dato, separados por divisores finos.
+   Los divisores salen del "gap" de 1px sobre un fondo más claro (así se ven igual con cualquier
+   cantidad de columnas, sin tener que dibujar bordes a mano). Las columnas las decide el ancho de
+   la propia franja, no el de la pantalla: con el menú lateral abierto o cerrado se acomoda sola.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Rojo apto para texto chico sobre las superficies oscuras (--red solo alcanza para números grandes). */
+  --red-bright: #f87171;
+}
+.databar { container: databar / inline-size; margin-bottom: 1.5rem; }
+.databar-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px;
+  margin: 0; background: var(--border2); border: 1px solid var(--border2);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+.databar-seg { background: var(--bg3); padding: .85rem 1rem; min-width: 0; display: flex; flex-direction: column; gap: .35rem; }
+.databar-etiqueta { margin: 0; min-height: 2.4em; font-size: 11px; line-height: 1.2; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text2); }
+.databar-cuerpo { margin: 0; display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.databar-valor {
+  font-size: clamp(1.4rem, 2.4cqi, 1.9rem); font-weight: 700; line-height: 1.1; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.databar-unidad { font-size: .6em; font-weight: 600; white-space: nowrap; color: var(--text2); }
+.databar-valor--largo { font-size: clamp(1.1rem, 2.3cqi, 1.65rem); }
+.databar-sub { font-size: 12px; color: var(--text2); }
+.databar-seg--blue   .databar-valor { color: var(--blue); }
+.databar-seg--red    .databar-valor { color: var(--red); }
+.databar-seg--amber  .databar-valor { color: var(--amber); }
+.databar-seg--green  .databar-valor { color: var(--green); }
+.databar-seg--purple .databar-valor { color: var(--purple-bright); }
+.databar-desglose { list-style: none; margin: .1rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.databar-desglose li { display: flex; justify-content: space-between; gap: .5rem; font-size: 12px; color: var(--text2); }
+.databar-desglose strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+.databar-tono-green { color: var(--green); }
+.databar-tono-amber { color: var(--amber); }
+.databar-tono-red   { color: var(--red-bright); }
+@container databar (min-width: 560px) { .databar-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .databar-etiqueta { min-height: 0; } }
+@container databar (min-width: 980px) { .databar-grid { grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.5fr); } .databar-etiqueta { min-height: 2.4em; } }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PIZARRA DEL INICIO (solo admin)
+   Una pizarra blanca real sobre el tema oscuro: marco de aluminio, superficie clara con brillo,
+   tornillos y bandeja con marcadores. Todo con CSS y un SVG chico; sin imágenes externas.
+   Adentro, un mosaico pastel por tema. Rojo = vencido / ya pasó, ámbar = próximo / pendiente:
+   el color siempre va acompañado de una palabra (Vencida, Próxima, Sin cargar…).
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  /* superficie y tinta de la pizarra (se mantienen claras aunque la app sea oscura) */
+  --pz-tinta: #1b2340;          /* texto principal: 14:1 sobre blanco */
+  --pz-tinta-2: #444e6b;        /* texto secundario: 7.5:1 sobre blanco */
+  --pz-superficie: #f4f6f9;
+  --pz-borde: #c4cbd8;
+  --pz-enlace: #1e3a9f;
+  /* aluminio del marco y de la bandeja */
+  --pz-alu-1: #f8fafb; --pz-alu-2: #cdd3da; --pz-alu-3: #eef1f4; --pz-alu-4: #aab3be;
+  /* un pastel por mosaico: celeste, lila, menta, durazno, rosa */
+  --pz-km: #d4e8ff;  --pz-km-tinta: #123a73;
+  --pz-adm: #e2dcff; --pz-adm-tinta: #35288a;
+  --pz-doc: #d1f0e3; --pz-doc-tinta: #0f5a3a;
+  --pz-cor: #ffe2cc; --pz-cor-tinta: #7a3a0a;
+  --pz-com: #fbd9e8; --pz-com-tinta: #7d1d4d;
+  /* urgencia (texto sobre fondo claro: todos ≥ 5.5:1) */
+  --pz-rojo: #b3261e;  --pz-rojo-fondo: #fde8e5;  --pz-rojo-borde: #efb0a8;  --pz-rojo-solido: #c62828;
+  --pz-ambar: #7a4a00; --pz-ambar-fondo: #fff2d0; --pz-ambar-borde: #efd391;  --pz-ambar-solido: #ffb300;
+  --pz-verde: #15663a; --pz-verde-solido: #1b7f45;
+}
+
+.pizarra { margin-bottom: 1.75rem; }
+.pz-solo-lector { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Marco de aluminio con bisel */
+.pz-marco {
+  position: relative; padding: 18px; border-radius: 24px;
+  background: linear-gradient(160deg, var(--pz-alu-1) 0%, var(--pz-alu-2) 32%, var(--pz-alu-3) 55%, var(--pz-alu-4) 100%);
+  box-shadow:
+    inset 0 1px 0 #fff, inset 0 -2px 4px rgba(0, 0, 0, .28), inset 2px 0 2px rgba(255, 255, 255, .5), inset -2px 0 2px rgba(0, 0, 0, .12),
+    0 0 0 1px rgba(0, 0, 0, .4), 0 2px 6px rgba(0, 0, 0, .35), 0 16px 34px rgba(0, 0, 0, .4);
+}
+/* Tornillos en las cuatro esquinas */
+.pz-tornillo {
+  position: absolute; width: 9px; height: 9px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #b4bcc6 55%, #7d8691 100%);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .4), inset 0 0 0 1px rgba(0, 0, 0, .2);
+}
+.pz-tornillo::after {
+  content: ''; position: absolute; left: 1.5px; right: 1.5px; top: 50%; height: 1.5px; margin-top: -.75px;
+  background: rgba(45, 55, 70, .8); transform: rotate(var(--giro, 0deg));
+}
+.pz-tornillo--a { top: 8px; left: 8px; --giro: 35deg; }
+.pz-tornillo--b { top: 8px; right: 8px; --giro: -20deg; }
+.pz-tornillo--c { bottom: 8px; left: 8px; --giro: 70deg; }
+.pz-tornillo--d { bottom: 8px; right: 8px; --giro: 10deg; }
+
+/* Superficie blanca con leve brillo; es el contenedor que decide cuántas columnas entran */
+.pz-superficie {
+  position: relative; isolation: isolate; container: pizarra / inline-size;
+  padding: 1rem; border-radius: 12px; color: var(--pz-tinta);
+  background: radial-gradient(120% 90% at 18% 0%, #ffffff 0%, var(--pz-superficie) 58%, #eceff3 100%);
+  box-shadow: inset 0 2px 6px rgba(20, 30, 50, .2), inset 0 0 0 1px rgba(20, 30, 50, .14);
+}
+.pz-superficie::before {      /* brillo en diagonal, por debajo del contenido */
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, .7) 50%, transparent 62%);
+  opacity: .55;
+}
+
+/* Bandeja para marcadores */
+.pz-bandeja {
+  position: relative; width: min(84%, 560px); height: 30px; margin: -2px auto 0;
+  border-radius: 0 0 16px 16px / 0 0 12px 12px;
+  background: linear-gradient(180deg, var(--pz-alu-1) 0%, var(--pz-alu-2) 45%, var(--pz-alu-4) 100%);
+  box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(0, 0, 0, .35), 0 8px 14px rgba(0, 0, 0, .4);
+}
+.pz-bandeja::before {         /* el canal donde apoyan los marcadores */
+  content: ''; position: absolute; left: 10px; right: 10px; top: 5px; bottom: 5px; border-radius: 6px;
+  background: linear-gradient(180deg, #98a1ad 0%, #d6dbe1 70%, #e8ebef 100%);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+}
+.pz-bandeja-items { position: absolute; left: 10px; right: 10px; bottom: 5px; width: calc(100% - 20px); height: 100%; overflow: visible; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .3)); }
+
+/* Cabecera de la pizarra (va dentro del marco) */
+.pz-cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+.pz-titulo { margin: 0; font-size: 1.2rem; font-weight: 800; letter-spacing: -.01em; color: var(--pz-tinta); }
+.pz-resumen { margin: .15rem 0 0; font-size: .9rem; color: var(--pz-tinta-2); }
+.pz-resumen strong { font-weight: 700; }
+.pz-rojo { color: var(--pz-rojo); }
+.pz-ambar { color: var(--pz-ambar); }
+.pz-verde { color: var(--pz-verde); }
+.pz-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.pz-hora { font-size: .78rem; color: var(--pz-tinta-2); }
+.pz-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; padding: 0 1rem;
+  font: inherit; font-size: .85rem; font-weight: 600; color: var(--pz-tinta); background: #fff;
+  border: 1px solid #98a2b3; border-radius: 12px; cursor: pointer; box-shadow: 0 1px 2px rgba(20, 30, 70, .12);
+  transition: background-color .15s, box-shadow .15s;
+}
+.pz-btn:hover:not(:disabled) { background: #eef1f7; box-shadow: 0 2px 4px rgba(20, 30, 70, .16); }
+.pz-btn:disabled { cursor: default; opacity: .7; }
+.pz-btn .spinner { border-color: #c3cad6; border-top-color: #3b3fd8; }
+.pz-aviso { margin: 0 0 .75rem; padding: .5rem .75rem; font-size: .82rem; color: var(--pz-ambar); background: var(--pz-ambar-fondo); border: 1px solid var(--pz-ambar-borde); border-radius: 10px; }
+.pz-cargando { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin: .5rem 0 0; font-size: .9rem; color: var(--pz-tinta-2); }
+.pz-cargando .spinner { border-color: #c3cad6; border-top-color: #3b3fd8; }
+
+/* Cuadrícula tipo tablero: en celular una columna; el ancho de la pizarra decide el resto */
+.pz-tablero {
+  display: grid; gap: .85rem; grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "km" "adm" "doc" "cor" "com";
+}
+.pz-sin-correo { grid-template-areas: "km" "adm" "doc" "com"; }
+@container pizarra (min-width: 520px) {
+  .pz-tablero { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "km adm" "doc cor" "doc com"; }
+  .pz-sin-correo { grid-template-areas: "km adm" "doc com"; }
+}
+@container pizarra (min-width: 800px) {
+  .pz-tablero { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-areas: "km adm doc" "cor com doc"; }
+  .pz-sin-correo { grid-template-areas: "km adm doc" "com com doc"; }
+}
+@container pizarra (min-width: 1000px) {
+  .pz-tablero { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-areas: "km adm adm doc" "km cor com doc"; }
+  .pz-sin-correo { grid-template-areas: "km adm adm doc" "km com com doc"; }
+}
+
+/* Mosaico pastel */
+.pz-mosaico {
+  --pz-tono: #e8ebf2; --pz-tono-tinta: var(--pz-tinta);
+  display: flex; flex-direction: column; gap: .6rem; min-width: 0; padding: .9rem; border-radius: 18px;
+  background: var(--pz-tono); color: var(--pz-tinta);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75), 0 1px 2px rgba(30, 40, 80, .14);
+}
+.pz-t-km  { --pz-tono: var(--pz-km);  --pz-tono-tinta: var(--pz-km-tinta);  grid-area: km; }
+.pz-t-adm { --pz-tono: var(--pz-adm); --pz-tono-tinta: var(--pz-adm-tinta); grid-area: adm; }
+.pz-t-doc { --pz-tono: var(--pz-doc); --pz-tono-tinta: var(--pz-doc-tinta); grid-area: doc; }
+.pz-t-cor { --pz-tono: var(--pz-cor); --pz-tono-tinta: var(--pz-cor-tinta); grid-area: cor; }
+.pz-t-com { --pz-tono: var(--pz-com); --pz-tono-tinta: var(--pz-com-tinta); grid-area: com; }
+.pz-mosaico-cab { display: flex; align-items: center; gap: .6rem; }
+.pz-icono { flex-shrink: 0; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(255, 255, 255, .8); color: var(--pz-tono-tinta); box-shadow: 0 1px 2px rgba(30, 40, 80, .16); }
+.pz-mosaico-titulo { flex: 1; min-width: 0; margin: 0; font-size: .95rem; font-weight: 700; color: var(--pz-tono-tinta); }
+.pz-contador { position: relative; flex-shrink: 0; min-width: 28px; padding: .1rem .55rem; text-align: center; font-size: .8rem; font-weight: 800; font-variant-numeric: tabular-nums; border-radius: 999px; }
+.pz-contador--alta  { background: var(--pz-rojo-solido); color: #fff; }
+.pz-contador--media { background: var(--pz-ambar-solido); color: #3d2800; }
+.pz-contador--ok    { background: var(--pz-verde-solido); color: #fff; }
+.pz-sub { margin: .25rem 0 0; font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--pz-tono-tinta); }
+.pz-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
+
+/* Tarjetita interna: el color de urgencia es suave y siempre viene con una etiqueta de texto */
+.pz-item {
+  display: flex; align-items: center; gap: .5rem; min-height: 48px; padding: .4rem .65rem; border-radius: 12px;
+  background: #fff; border: 1px solid transparent; box-shadow: 0 1px 2px rgba(20, 30, 70, .14);
+}
+.pz-item--alta  { background: #fff7f6; border-color: var(--pz-rojo-borde); }
+.pz-item--media { background: #fffbf1; border-color: var(--pz-ambar-borde); }
+.pz-item-main { flex: 1; min-width: 0; }
+.pz-item-titulo { margin: 0; font-size: .9rem; font-weight: 600; line-height: 1.25; color: var(--pz-tinta); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.pz-item-sub { margin: 0; font-size: .78rem; line-height: 1.3; color: var(--pz-tinta-2); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.pz-etiqueta { flex-shrink: 0; padding: .15rem .55rem; font-size: .72rem; font-weight: 700; border-radius: 999px; border: 1px solid transparent; }
+.pz-etiqueta--alta  { color: var(--pz-rojo);  background: var(--pz-rojo-fondo);  border-color: var(--pz-rojo-borde); }
+.pz-etiqueta--media { color: var(--pz-ambar); background: var(--pz-ambar-fondo); border-color: var(--pz-ambar-borde); }
+.pz-mas { margin: 0; padding: .15rem .25rem 0; font-size: .78rem; color: var(--pz-tono-tinta); }
+.pz-vacio { display: flex; align-items: center; gap: .4rem; margin: .25rem 0; font-size: .9rem; font-weight: 600; color: var(--pz-verde); }
+.pz-vacio svg { flex-shrink: 0; }
+.pz-error { margin: .25rem 0; font-size: .85rem; color: var(--pz-tinta); }
+.pz-banner { margin: 0; padding: .45rem .65rem; font-size: .8rem; font-weight: 600; color: var(--pz-ambar); background: var(--pz-ambar-fondo); border: 1px solid var(--pz-ambar-borde); border-radius: 10px; }
+.pz-banner--alta { color: var(--pz-rojo); background: var(--pz-rojo-fondo); border-color: var(--pz-rojo-borde); }
+.pz-pie { display: flex; flex-wrap: wrap; gap: 0 1rem; margin-top: auto; }
+.pz-link { display: inline-flex; align-items: center; min-height: 44px; font-size: .82rem; font-weight: 700; color: var(--pz-enlace); text-decoration: underline; text-underline-offset: 3px; }
+.pz-link:hover { color: #0f2570; }
+
+/* Círculo para tildar (44px de área tocable; navegable con teclado) */
+.pz-check { flex-shrink: 0; width: 44px; height: 44px; margin: -.4rem -.2rem -.4rem -.55rem; display: inline-flex; align-items: center; justify-content: center; padding: 0; background: none; border: 0; border-radius: 12px; cursor: pointer; }
+.pz-check span { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #6b7699; background: #fff; display: inline-flex; align-items: center; justify-content: center; color: transparent; transition: background-color .15s, border-color .15s, color .15s; }
+.pz-check:hover span, .pz-check:focus-visible span { background: #dff5e8; border-color: var(--pz-verde-solido); color: var(--pz-verde); }
+.pz-check:disabled { cursor: default; opacity: .6; }
+
+/* Foco visible, igual en toda la pizarra */
+.pz-btn:focus-visible, .pz-link:focus-visible, .pz-check:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .pz-marco { padding: 12px; border-radius: 18px; }
+  .pz-tornillo { width: 7px; height: 7px; }
+  .pz-tornillo--a, .pz-tornillo--b { top: 5px; } .pz-tornillo--c, .pz-tornillo--d { bottom: 5px; }
+  .pz-tornillo--a, .pz-tornillo--c { left: 5px; } .pz-tornillo--b, .pz-tornillo--d { right: 5px; }
+  .pz-superficie { padding: .75rem; }
+  .pz-bandeja { width: 90%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pz-btn, .pz-check span { transition: none; }
+  .pz-btn .spinner, .pz-cargando .spinner { animation-duration: 1.6s; }
+}

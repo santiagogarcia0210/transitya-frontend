@@ -5,6 +5,8 @@ import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
 import PizarraInicio from '@/components/PizarraInicio';
+import BarraDatos from '@/components/BarraDatos';
+import type { SegmentoDato } from '@/components/BarraDatos';
 
 /* ─── Tipos ─────────────────────────────────────────────────────────── */
 
@@ -447,15 +449,26 @@ export default function DashboardPage() {
 
   const saldo = tab.totalPagadoMes - tab.totalEgresosMes;
 
-  const kpis = [
-    { label:'Beneficiarios activos', value:String(tab.beneficiariosActivos), color:'var(--blue)', icon:'👥',
-      sub: tab.bajasMes>0 ? `${tab.bajasMes} baja${tab.bajasMes!==1?'s':''} este mes` : tab.mesNombre },
-    { label:'Egresos del mes', value:fmtK(tab.totalEgresosMes), color:'var(--red)', icon:'💸',
-      sub:`${tab.egresosMes} registro${tab.egresosMes!==1?'s':''}` },
-    { label:'Ingresos del mes', value:fmtK(tab.totalIngresosMes), color:'var(--green)', icon:'💰',
-      sub:`Cobrado: ${fmtK(tab.totalPagadoMes)}` },
-    { label:'KM del mes', value:tab.kmMes>0?tab.kmMes.toLocaleString('es-AR'):'—', color:'var(--purple)', icon:'🛣️',
-      sub:tab.combustibleMes>0?`${tab.combustibleMes.toFixed(0)} L`:' Sin reportes' },
+  // Segmentos de la barra de datos del Inicio (un solo renglón de ancho completo).
+  const plural = (n:number, uno:string, varios:string) => `${n} ${n===1?uno:varios}`;
+  const segmentos: SegmentoDato[] = [
+    { id:'t-activos',  etiqueta:'Beneficiarios activos', valor:String(tab.beneficiariosActivos), tono:'blue',
+      sub:`${tab.mesNombre} ${tab.anio}` },
+    { id:'t-bajas',    etiqueta:'Bajas del mes', valor:String(tab.bajasMes), tono:'red',
+      sub: tab.bajasMes>0 ? plural(tab.bajasMes,'beneficiario','beneficiarios') : 'Ninguna este mes' },
+    { id:'t-egresos',  etiqueta:'Gasto del mes', valor:fmtK(tab.totalEgresosMes), tono:'amber',
+      sub: plural(tab.egresosMes,'registro','registros') },
+    { id:'t-ingresos', etiqueta:'Facturado pagado', valor:fmtK(tab.totalPagadoMes), tono:'green',
+      sub:`Presentado: ${fmtK(tab.totalPresentadoMes)}` },
+    { id:'t-km',       etiqueta:'Km del mes', valor: tab.kmMes>0 ? <>{tab.kmMes.toLocaleString('es-AR')}<span className="databar-unidad"> km</span></> : '—', tono:'purple',
+      sub: tab.combustibleMes>0 ? `${tab.combustibleMes.toFixed(0)} L` : 'Sin reportes' },
+    { id:'t-saldo',    etiqueta:'Saldo del mes', valor:`${saldo>=0?'+':''}${fmt(saldo)}`, tono: saldo>=0 ? 'green' : 'red', largo:true,
+      sub:'Cobrado − egresos',
+      desglose:[
+        { etiqueta:'Cobrado',   valor:fmtK(tab.totalPagadoMes),      completo:fmt(tab.totalPagadoMes),      tono:'green' },
+        { etiqueta:'Pendiente', valor:fmtK(tab.totalPresentadoMes),  completo:fmt(tab.totalPresentadoMes),  tono:'amber' },
+        { etiqueta:'Egresos',   valor:fmtK(tab.totalEgresosMes),     completo:fmt(tab.totalEgresosMes),     tono:'red' },
+      ] },
   ];
 
   // Módulos visibles para este tipo de empresa
@@ -527,42 +540,11 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* ── KPIs — tablero-card estilo GAS ─────────────────────────────────── */}
-      <div className="tablero" style={{ marginBottom:'1.5rem' }}>
-        {[
-          { id:'t-activos', label:'Beneficiarios activos', value:String(tab.beneficiariosActivos), color:'blue',  sub: tab.bajasMes>0 ? `${tab.bajasMes} baja${tab.bajasMes!==1?'s':''} este mes` : tab.mesNombre },
-          { id:'t-bajas',   label:'Bajas del mes',          value:String(tab.bajasMes),            color:'red',   sub:'' },
-          { id:'t-egresos', label:'Gasto del mes',          value:fmtK(tab.totalEgresosMes),       color:'amber', sub:`${tab.egresosMes} registros` },
-          { id:'t-ingresos',label:'Facturado pagado',       value:fmtK(tab.totalPagadoMes),        color:'green', sub:`Presentado: ${fmtK(tab.totalPresentadoMes)}` },
-          { id:'t-km',      label:'KM del mes',             value:tab.kmMes>0?tab.kmMes.toLocaleString('es-AR')+' km':'—', color:'purple', sub: tab.combustibleMes>0?`${tab.combustibleMes.toFixed(0)} L`:'' },
-        ].map(k => (
-          <div key={k.id} className={`tablero-card ${k.color}`}>
-            <div className="tablero-label">{k.label}</div>
-            <div className="tablero-value" id={k.id}>{k.value}</div>
-            {k.sub && <div className="tablero-sub">{k.sub}</div>}
-          </div>
-        ))}
-      </div>
+      {/* ── Barra de datos: una sola franja con los números del mes ───────────── */}
+      <BarraDatos titulo="Resumen del mes" segmentos={segmentos} />
 
-      {/* Saldo + Movimientos */}
-      <div className="saldo-grid">
-        {/* Saldo */}
-        <div className="card" style={{ borderLeft:`4px solid ${saldo>=0?'var(--green)':'var(--red)'}` }}>
-          <p style={{ fontSize:'.78rem', color:'var(--text3)', marginBottom:'.35rem' }}>Saldo del mes · cobrado − egresos</p>
-          <p style={{ fontSize:'1.6rem', fontWeight:700, color:saldo>=0?'var(--green)':'var(--red)' }}>
-            {saldo>=0?'+':''}{fmt(saldo)}
-          </p>
-          <div style={{ display:'flex', gap:'1rem', marginTop:'.5rem', flexWrap:'wrap' }}>
-            {[['Cobrado',tab.totalPagadoMes,'var(--green)'],['Pendiente',tab.totalPresentadoMes,'var(--amber)'],['Egresos',tab.totalEgresosMes,'var(--red)']].map(([l,v,c])=>(
-              <div key={String(l)}>
-                <p style={{ fontSize:'.7rem', color:'var(--text3)' }}>{l}</p>
-                <p style={{ fontSize:'.88rem', fontWeight:600, color:String(c) }}>{fmt(Number(v))}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Últimos movimientos */}
+      {/* Últimos movimientos */}
+      <div style={{ marginBottom:'1.5rem' }}>
         <div className="card">
           <p style={{ fontSize:'.85rem', fontWeight:600, color:'var(--text)', marginBottom:'.85rem' }}>
             📋 Últimos movimientos — {tab.mesNombre}
