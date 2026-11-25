@@ -1141,3 +1141,72 @@ input.input-error, select.input-error, textarea.input-error { border-color: var(
   .login-logo-img  { animation: none; filter: drop-shadow(0 0 10px rgba(108,95,255,.4)); }
   .login-logo-wrap { animation: none; opacity: 1; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MAPAS (Leaflet)
+   ═══════════════════════════════════════════════════════════════════════ */
+/* Leaflet usa z-index de 200 a 1000 en sus paneles y controles. Si el contenedor del mapa no
+   crea su propio contexto de apilamiento, esos valores compiten con los del resto de la app y el
+   mapa pasa por ENCIMA de la barra inferior (z-index 40), del menú lateral (50) y de los modales
+   (50/60). isolation:isolate deja todo ese z-index adentro del mapa; hacia afuera el mapa queda en
+   el nivel base, por debajo de la barra, el menú y los modales. Es una sola regla para todos los
+   mapas de la app (Inicio, Choferes en mapa, Mi ruta, recorrido y seguimiento público). */
+.leaflet-container { position: relative; isolation: isolate; }
+
+/* Mapa del Inicio. "Ampliar" alarga la altura. En celular se descuenta el alto de la barra
+   inferior (~104px desde el borde de abajo) y el encabezado, para que el mapa ampliado entre
+   entero por encima de la barra. dvh sigue a la barra de direcciones del navegador móvil. */
+.mapa-inicio {
+  width: 100%; height: 280px; overflow: hidden;
+  border-radius: var(--radius-lg); transition: height .25s ease;
+}
+.mapa-inicio--ampliado { height: 70vh; height: 70dvh; }
+@media (max-width: 768px) {
+  .mapa-inicio--ampliado {
+    height: calc(100vh - 108px - 6rem);
+    height: calc(100dvh - 108px - 6rem);
+    min-height: 260px;
+  }
+}
+@media (prefers-reduced-motion: reduce) { .mapa-inicio { transition: none; } }
+
+/* ── Pizarra del Inicio (solo admin) ───────────────────────────────────────
+   Una tarjeta con una columna por tema. En el celular las columnas se apilan
+   (la grilla baja a 1 columna sola por el minmax). El color de urgencia va en
+   los badges: rojo = vencido / ya pasó, ámbar = próximo / pendiente. */
+.pizarra { padding: 1rem; margin-bottom: 1.5rem; }
+.pizarra-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+.pizarra-titulo { font-size: 1rem; font-weight: 700; color: var(--text); }
+.pizarra-resumen { font-size: .85rem; color: var(--text2); margin-top: .15rem; }
+.pizarra-resumen strong { font-weight: 700; }
+.pizarra-resumen .pz-rojo { color: var(--red); }
+.pizarra-resumen .pz-ambar { color: var(--amber); }
+.pizarra-resumen .pz-verde { color: var(--green); }
+.pizarra-acciones { display: flex; align-items: center; gap: .75rem; }
+.pizarra-hora { font-size: .72rem; color: var(--text3); }
+.pizarra-aviso { font-size: .8rem; color: var(--amber); margin-bottom: .75rem; }
+.pizarra-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: .75rem; align-items: start; }
+.pizarra-col { background: var(--bg4); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: .75rem; min-width: 0; }
+.pizarra-col-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
+.pizarra-col-titulo { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); }
+.pizarra-sub { font-size: .75rem; font-weight: 600; color: var(--text2); margin: .6rem 0 .25rem; }
+.pizarra-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .25rem; }
+.pizarra-item { display: flex; align-items: center; gap: .5rem; min-height: 44px; padding: .35rem .5rem; border-radius: var(--radius); background: var(--bg3); }
+.pizarra-item-main { flex: 1; min-width: 0; }
+.pizarra-item-titulo { font-size: .85rem; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pizarra-item-sub { font-size: .72rem; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pizarra-item .badge { flex-shrink: 0; }
+.pizarra-mas { font-size: .75rem; color: var(--text3); padding: .35rem .5rem 0; }
+.pizarra-vacio { font-size: .85rem; color: var(--green); padding: .6rem .25rem; }
+.pizarra-error { font-size: .82rem; color: var(--text2); padding: .5rem .25rem; }
+.pizarra-banner { font-size: .78rem; color: var(--amber); background: var(--amber-dim); border-radius: var(--radius); padding: .4rem .6rem; margin-bottom: .5rem; }
+.pizarra-banner.pz-rojo { color: var(--red); background: var(--red-dim); }
+.pizarra-pie { display: flex; flex-wrap: wrap; gap: 0 1rem; margin-top: .4rem; }
+.pizarra-link { display: inline-flex; align-items: center; min-height: 44px; font-size: .8rem; font-weight: 600; color: var(--blue-bright); text-decoration: none; }
+.pizarra-link:hover { text-decoration: underline; }
+.pizarra-check { flex-shrink: 0; width: 44px; height: 44px; margin: -.35rem -.25rem -.35rem -.5rem; display: inline-flex; align-items: center; justify-content: center; background: none; border: 0; cursor: pointer; border-radius: var(--radius); }
+.pizarra-check span { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border2); display: inline-flex; align-items: center; justify-content: center; color: transparent; transition: background-color .15s, border-color .15s, color .15s; }
+.pizarra-check:hover span, .pizarra-check:focus-visible span { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+.pizarra-check:disabled { cursor: default; opacity: .6; }
+.pizarra-cargando { display: flex; align-items: center; gap: .75rem; color: var(--text3); font-size: .85rem; padding: .5rem 0; }
+@media (prefers-reduced-motion: reduce) { .pizarra-check span { transition: none; } }

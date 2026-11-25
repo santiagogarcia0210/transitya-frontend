@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
+import PizarraInicio from '@/components/PizarraInicio';
 
 /* ─── Tipos ─────────────────────────────────────────────────────────── */
 
@@ -104,10 +105,9 @@ function MapaChoferes({ ubicaciones, fullscreen }: { ubicaciones:UbicChofer[]; f
     });
   }, [ubicaciones]);
 
-  return (
-    <div ref={mapRef} style={{ width:'100%', height: fullscreen ? '70vh' : 280,
-      borderRadius:'var(--radius-lg)', overflow:'hidden', transition:'height .25s ease' }} />
-  );
+  // La altura y el borde salen de clases (globals.css): así en celular se puede descontar la barra
+  // inferior cuando el mapa está ampliado. El aislamiento de z-index lo da .leaflet-container.
+  return <div ref={mapRef} className={`mapa-inicio${fullscreen ? ' mapa-inicio--ampliado' : ''}`} />;
 }
 
 /* ─── Módulo Chofer ──────────────────────────────────────────────────── */
@@ -591,6 +591,9 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Pizarra de pendientes: solo admin. Carga su propio endpoint, no depende del tablero. */}
+      {(perfil?.rol === 'admin' || perfil?.rol === 'administrador') && <PizarraInicio />}
 
       {/* Mapa en tiempo real */}
       {ubicaciones.length > 0 && (
