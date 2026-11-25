@@ -15,6 +15,12 @@ const AYUDA: Record<Categoria, string> = {
   mensual: 'Lo que se presenta todos los meses junto con la factura.',
 };
 
+// Lo que el servidor puede cargar o actualizar con los requisitos oficiales (GET /api/requisitos-os).
+interface ObraSemilla { id: string; nombre: string }
+interface Semilla { nuevas: ObraSemilla[]; actualizables: ObraSemilla[] }
+const semillaDe = (d: { semilla?: Partial<Semilla> } | undefined): Semilla =>
+  ({ nuevas: d?.semilla?.nuevas || [], actualizables: d?.semilla?.actualizables || [] });
+
 const nuevoReq = (categoria: Categoria): Requisito => ({
   key: '', nombre: '', categoria, vencimiento: categoria === 'paciente' ? 'meses' : 'no',
   vigenciaMeses: 12, obligatorio: true, condicion: '', notas: '',
@@ -35,6 +41,9 @@ export default function RequisitosOSPage() {
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [sucio, setSucio] = useState(false);
+  const [semilla, setSemilla] = useState<Semilla>({ nuevas: [], actualizables: [] });
+  const [cargandoSemilla, setCargandoSemilla] = useState(false);
+  const [avisoSemilla, setAvisoSemilla] = useState<{ text: string; ok: boolean } | null>(null);
 
   const mostrar = (o: ObraSocial | undefined) => {
     setSelId(o?.id || '');
@@ -49,13 +58,13 @@ export default function RequisitosOSPage() {
   }, []);
 
   const cargar = useCallback(async (mantener?: string) => {
-    try { const r = await api.get('/api/requisitos-os'); aplicarLista(r.data.obras || [], mantener); } catch { /* silent */ }
+    try { const r = await api.get('/api/requisitos-os'); aplicarLista(r.data.obras || [], mantener); setSemilla(semillaDe(r.data)); } catch { /* silent */ }
   }, [aplicarLista]);
 
   useEffect(() => {
     if (authLoading) return;
     let vivo = true;
-    api.get('/api/requisitos-os').then(r => { if (vivo) aplicarLista(r.data.obras || []); })
+    api.get('/api/requisitos-os').then(r => { if (vivo) { aplicarLista(r.data.obras || []); setSemilla(semillaDe(r.data)); } })
       .catch(() => {}).finally(() => { if (vivo) setLoading(false); });
     return () => { vivo = false; };
   }, [authLoading, aplicarLista]);
@@ -69,6 +78,19 @@ export default function RequisitosOSPage() {
   const cargarBorrador = async () => {
     try { const r = await api.post('/api/requisitos-os/semilla'); setMsg({ text: r.data.mensaje, ok: true }); await cargar(); }
     catch (e) { setMsg({ text: mensajeError(e), ok: false }); }
+  };
+
+  // Para empresas que ya tienen alguna obra social: agrega las que faltan y actualiza las que
+  // quedaron como se cargaron la primera vez. El servidor nunca pisa lo que se editó o revisó.
+  const cargarOficiales = async () => {
+    if (sucio && !window.confirm('Tenés cambios sin guardar. ¿Descartarlos?')) return;
+    setCargandoSemilla(true); setAvisoSemilla(null);
+    try {
+      const r = await api.post('/api/requisitos-os/semilla');
+      await cargar(selId);                 // vuelve a leer, conservando la obra social que se estaba viendo
+      setAvisoSemilla({ text: r.data.mensaje, ok: true });
+    } catch (e) { setAvisoSemilla({ text: mensajeError(e, 'No se pudieron cargar los requisitos'), ok: false }); }
+    setCargandoSemilla(false);
   };
 
   const nueva = () => {
@@ -122,13 +144,30 @@ export default function RequisitosOSPage() {
         <div className="card" style={{ padding: '1.5rem', textAlign: 'center' }}>
           <p style={{ fontSize: '.95rem', color: 'var(--text)', fontWeight: 600 }}>Todavía no hay obras sociales configuradas</p>
           <p style={{ fontSize: '.82rem', color: 'var(--text3)', margin: '.5rem 0 1rem' }}>
-            Hay un borrador listo con Incluir Salud, PAMI y OSPRERA. Cargalo y después corregí lo que no coincida con lo que te piden en la práctica.
+            Hay requisitos listos con Incluir Salud, PAMI, OSPRERA y Subsidio IPSST. Los de Incluir Salud, OSPRERA y Subsidio IPSST salen de documentos oficiales; PAMI es un borrador. Cargalos y después corregí lo que no coincida con lo que te piden en la práctica.
           </p>
           <button className="btn btn-primary" onClick={cargarBorrador}>Cargar borrador</button>
           {msg && <p style={{ fontSize: '.82rem', color: msg.ok ? 'var(--green)' : 'var(--red)', marginTop: '.75rem' }}>{msg.text}</p>}
         </div>
       ) : (
         <>
+          {/* Con obras sociales ya cargadas la lista vacía no aparece, así que el botón para traer
+              los requisitos oficiales vive acá. Solo se muestra si hay algo para cargar. */}
+          {(semilla.nuevas.length > 0 || semilla.actualizables.length > 0) && (
+            <div className="card" style={{ padding: '.9rem 1rem', marginBottom: '1rem', borderColor: 'var(--amber)' }}>
+              <p style={{ fontSize: '.86rem', fontWeight: 700, color: 'var(--text)' }}>Hay requisitos oficiales para cargar</p>
+              <p style={{ fontSize: '.78rem', color: 'var(--text3)', margin: '.25rem 0 .6rem' }}>
+                {semilla.nuevas.length > 0 && <>Se agregan: {semilla.nuevas.map(o => o.nombre).join(', ')}. </>}
+                {semilla.actualizables.length > 0 && <>Se actualizan: {semilla.actualizables.map(o => o.nombre).join(', ')} (siguen como se cargaron la primera vez, sin cambios tuyos). </>}
+                Lo que ya editaste o marcaste como revisado no se toca.
+              </p>
+              <button className="btn btn-primary" onClick={cargarOficiales} disabled={cargandoSemilla}>
+                {cargandoSemilla ? <><span className="spinner" style={{ width: 12, height: 12 }} />Cargando…</> : 'Cargar requisitos oficiales'}
+              </button>
+            </div>
+          )}
+          {avisoSemilla && <p style={{ fontSize: '.82rem', color: avisoSemilla.ok ? 'var(--green)' : 'var(--red)', marginBottom: '.75rem' }}>{avisoSemilla.text}</p>}
+
           <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
             {obras.map(o => (
               <button key={o.id} className={o.id === selId ? 'btn btn-primary' : 'btn btn-secondary'} style={{ fontSize: '.82rem' }} onClick={() => elegir(o.id)}>
