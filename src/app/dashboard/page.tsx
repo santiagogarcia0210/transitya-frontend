@@ -463,7 +463,6 @@ export default function DashboardPage() {
     { id:'t-km',       etiqueta:'Km del mes', valor: tab.kmMes>0 ? <>{tab.kmMes.toLocaleString('es-AR')}<span className="databar-unidad"> km</span></> : '—', tono:'purple',
       sub: tab.combustibleMes>0 ? `${tab.combustibleMes.toFixed(0)} L` : 'Sin reportes' },
     { id:'t-saldo',    etiqueta:'Saldo del mes', valor:`${saldo>=0?'+':''}${fmt(saldo)}`, tono: saldo>=0 ? 'green' : 'red', largo:true,
-      sub:'Cobrado − egresos',
       desglose:[
         { etiqueta:'Cobrado',   valor:fmtK(tab.totalPagadoMes),      completo:fmt(tab.totalPagadoMes),      tono:'green' },
         { etiqueta:'Pendiente', valor:fmtK(tab.totalPresentadoMes),  completo:fmt(tab.totalPresentadoMes),  tono:'amber' },
@@ -477,81 +476,65 @@ export default function DashboardPage() {
   /* ─── Render ──────────────────────────────────────────────────────── */
   return (
     <div>
-      {/* ── Header estilo GAS: logo empresa circular + nombre + mes/año + semáforo chips ── */}
-      <div style={{ marginBottom:'1.25rem' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
-          {/* Logo empresa circular — desde Firestore o fallback iniciales */}
-          {tab.empresaLogo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={tab.empresaLogo}
-              alt="Empresa"
-              style={{ height:64, width:64, borderRadius:'50%', objectFit:'cover',
-                border:'3px solid var(--blue)', boxShadow:'0 0 0 6px rgba(59,130,246,0.15)',
-                flexShrink:0 }}
-            />
-          ) : (
-            <div style={{
-              height:64, width:64, borderRadius:'50%', flexShrink:0,
-              background:'var(--blue-dim)', border:'3px solid var(--blue)',
-              boxShadow:'0 0 0 6px rgba(59,130,246,0.15)',
-              display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize:'1.4rem', fontWeight:800, color:'var(--blue)',
-            }}>
-              {(tab.empresaNombre || 'T').split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() || '🚐'}
-            </div>
-          )}
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:'1.15rem', fontWeight:800, color:'var(--text)', letterSpacing:'-.01em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-              {tab.empresaNombre || 'TRANSPORTE FLORES'}
-            </div>
-            <div style={{ fontSize:'.82rem', color:'var(--text3)', marginTop:'2px' }}>
-              {tab.mesNombre} {tab.anio} · Datos en tiempo real
+      {/* ── Cabecera compacta: empresa + chips de "Reporte KM hoy" + Actualizar, en una sola línea ── */}
+      <div className="inicio-cab-wrap">
+        <div className="inicio-cab">
+          <div className="inicio-cab-id">
+            {tab.empresaLogo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={tab.empresaLogo} alt="Empresa" className="inicio-logo" />
+            ) : (
+              <div className="inicio-logo inicio-logo--iniciales">
+                {(tab.empresaNombre || 'T').split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase() || '🚐'}
+              </div>
+            )}
+            <div className="inicio-cab-texto">
+              <div className="inicio-cab-nombre">{tab.empresaNombre || 'TRANSPORTE FLORES'}</div>
+              <div className="inicio-cab-sub">{tab.mesNombre} {tab.anio} · Datos en tiempo real</div>
             </div>
           </div>
-          <div style={{ marginLeft:'auto' }}>
-            <button className="btn btn-secondary" onClick={()=>{fetchTablero();fetchUbicaciones();fetchAsistHoy();}} style={{ fontSize:'.8rem' }}>
-              ↻ Actualizar
-            </button>
-          </div>
-        </div>
 
-        {/* Semáforo reportes KM — chips idénticos al GAS */}
-        {tab.estadoChoferes.length > 0 && (
-          <div style={{ marginTop:'12px', padding:'10px 12px', background:'var(--bg3)', borderRadius:'10px' }}>
-            <div style={{ fontSize:'11px', fontWeight:700, color:'var(--text3)', marginBottom:'8px' }}>🛣 Reporte KM hoy</div>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:'8px' }}>
+          {/* Semáforo reportes KM — los mismos chips de siempre, ahora en la línea de la cabecera */}
+          {tab.estadoChoferes.length > 0 && (
+            <div className="inicio-chips" role="group" aria-label="Reporte KM hoy">
+              <span className="inicio-chips-titulo">🛣 Reporte KM hoy</span>
               {tab.estadoChoferes.map((ch,i) => (
-                <div key={ch.nombre||i} style={{
-                  display:'flex', alignItems:'center', gap:'5px',
-                  padding:'5px 10px', borderRadius:'20px',
-                  background: ch.tieneReporte ? 'rgba(63,185,80,0.12)' : 'rgba(248,81,73,0.12)',
-                  border: `1px solid ${ch.tieneReporte ? 'rgba(63,185,80,0.3)' : 'rgba(248,81,73,0.3)'}`,
-                }}>
-                  <span style={{ fontSize:'14px', flexShrink:0 }}>{ch.tieneReporte ? '✅' : '❌'}</span>
-                  <div style={{ minWidth:0, overflow:'hidden' }}>
-                    <div style={{ fontSize:'11px', fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'120px' }}>{ch.nombre||ch.usuario}</div>
-                    {ch.vehiculo && <div style={{ fontSize:'10px', color:'var(--text3)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'120px' }}>{ch.vehiculo}</div>}
+                <div key={ch.nombre||i} className={`inicio-chip ${ch.tieneReporte ? 'inicio-chip--ok' : 'inicio-chip--falta'}`}
+                  title={`${ch.nombre||ch.usuario}: ${ch.tieneReporte ? 'ya cargó los km de hoy' : 'todavía no cargó los km de hoy'}`}>
+                  <span className="inicio-chip-icono">{ch.tieneReporte ? '✅' : '❌'}</span>
+                  <div className="inicio-chip-texto">
+                    <div className="inicio-chip-nombre">{ch.nombre||ch.usuario}</div>
+                    {ch.vehiculo && <div className="inicio-chip-veh">{ch.vehiculo}</div>}
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+
+          <button className="btn btn-secondary inicio-cab-act" onClick={()=>{fetchTablero();fetchUbicaciones();fetchAsistHoy();}}>
+            ↻ Actualizar
+          </button>
+        </div>
       </div>
 
       {/* ── Barra de datos: una sola franja con los números del mes ───────────── */}
       <BarraDatos titulo="Resumen del mes" segmentos={segmentos} />
 
-      {/* Últimos movimientos */}
-      <div style={{ marginBottom:'1.5rem' }}>
-        <div className="card">
-          <p style={{ fontSize:'.85rem', fontWeight:600, color:'var(--text)', marginBottom:'.85rem' }}>
-            📋 Últimos movimientos — {tab.mesNombre}
-          </p>
-          {movimientos.length===0 ? (
-            <p style={{ fontSize:'.82rem', color:'var(--text3)' }}>Sin movimientos registrados este mes</p>
-          ) : (
+      {/* Pizarra de pendientes: solo admin. Carga su propio endpoint, no depende del tablero. */}
+      {(perfil?.rol === 'admin' || perfil?.rol === 'administrador') && <PizarraInicio />}
+
+      {/* Últimos movimientos — debajo de la pizarra; sin datos, una línea fina */}
+      {movimientos.length===0 ? (
+        <p className="movs-linea">
+          <span>📋 <strong>Últimos movimientos — {tab.mesNombre}</strong></span>
+          <span>Sin movimientos registrados este mes</span>
+        </p>
+      ) : (
+        <div style={{ marginBottom:'1.5rem' }}>
+          <div className="card">
+            <p style={{ fontSize:'.85rem', fontWeight:600, color:'var(--text)', marginBottom:'.85rem' }}>
+              📋 Últimos movimientos — {tab.mesNombre}
+            </p>
             <div style={{ display:'flex', flexDirection:'column', gap:'.35rem' }}>
               {movimientos.map((m,i)=>(
                 <div key={m.id||i} style={{ display:'flex', alignItems:'center', gap:'.75rem',
@@ -570,12 +553,9 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
-          )}
+          </div>
         </div>
-      </div>
-
-      {/* Pizarra de pendientes: solo admin. Carga su propio endpoint, no depende del tablero. */}
-      {(perfil?.rol === 'admin' || perfil?.rol === 'administrador') && <PizarraInicio />}
+      )}
 
       {/* Mapa en tiempo real */}
       {ubicaciones.length > 0 && (

@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import Link from 'next/link';
 import {
   IconCheck, IconCircleCheck, IconClipboardCheck, IconFiles, IconMail, IconReceipt, IconRefresh, IconRoute,
@@ -61,6 +61,10 @@ function textoVence(diff: number | null): string {
 /** Clase de color de urgencia de una tarjetita y de su etiqueta (siempre va acompañada de texto). */
 const urgencia = (nivel: Nivel) => (nivel === 'ALTA' ? 'alta' : 'media');
 
+/** Lo urgente primero. Es un orden estable: dentro de cada grupo queda el orden que mandó el servidor. */
+const urgentesPrimero = <T extends { nivel: Nivel }>(items: T[]): T[] =>
+  [...items].sort((a, b) => Number(b.nivel === 'ALTA') - Number(a.nivel === 'ALTA'));
+
 function horaAR(iso: string): string {
   try { return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Tucuman' }); }
   catch { return ''; }
@@ -103,9 +107,9 @@ function Bandeja() {
 }
 
 /** Marco de aluminio + superficie blanca con los cuatro tornillos. Lo usan el estado de carga y el normal. */
-function Marco({ children, ocupado }: { children: ReactNode; ocupado: boolean }) {
+function Marco({ children, ocupado, raizRef }: { children: ReactNode; ocupado: boolean; raizRef: RefObject<HTMLElement | null> }) {
   return (
-    <section className="pizarra" aria-labelledby="pizarra-titulo" aria-busy={ocupado}>
+    <section className="pizarra" aria-labelledby="pizarra-titulo" aria-busy={ocupado} ref={raizRef}>
       <div className="pz-marco">
         <span className="pz-tornillo pz-tornillo--a" aria-hidden="true" />
         <span className="pz-tornillo pz-tornillo--b" aria-hidden="true" />
@@ -128,6 +132,31 @@ function Mosaico({ clase, titulo, icono, col, hayAlgo, vacio, children, pie }: {
   const estado = total === 0 ? 'ok' : col.urgentes > 0 ? 'alta' : 'media';
   const idTitulo = `pz-h-${clase}`;
   const leyenda = total === 0 ? 'Al día' : `${plural(total, 'pendiente', 'pendientes')}, ${plural(col.urgentes, 'urgente', 'urgentes')}`;
+
+  // El cuerpo scrollea por su cuenta cuando no entra. Si desborda, se vuelve alcanzable con el teclado
+  // (tabindex + nombre); si no, no suma una parada de tabulación inútil. Se toca el DOM directo y no el
+  // estado para no encadenar renders desde un efecto.
+  const cuerpoRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = cuerpoRef.current;
+    if (!el) return;
+    const revisar = () => {
+      if (el.scrollHeight > el.clientHeight + 1) {
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('role', 'region');
+        el.setAttribute('aria-label', `${titulo}: lista con desplazamiento`);
+      } else {
+        el.removeAttribute('tabindex');
+        el.removeAttribute('role');
+        el.removeAttribute('aria-label');
+      }
+    };
+    revisar();
+    const ro = new ResizeObserver(revisar);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+
   return (
     <section className={`pz-mosaico pz-t-${clase}`} aria-labelledby={idTitulo}>
       <div className="pz-mosaico-cab">
@@ -140,11 +169,13 @@ function Mosaico({ clase, titulo, icono, col, hayAlgo, vacio, children, pie }: {
           </span>
         )}
       </div>
-      {col.error ? (
-        <p className="pz-error">{col.mensaje || 'No se pudo cargar esta sección.'} Probá actualizar en un momento.</p>
-      ) : !hayAlgo ? (
-        <p className="pz-vacio"><IconCircleCheck size={20} stroke={2} aria-hidden="true" /> {vacio || 'Todo al día'}</p>
-      ) : children}
+      <div className="pz-cuerpo" ref={cuerpoRef}>
+        {col.error ? (
+          <p className="pz-error">{col.mensaje || 'No se pudo cargar esta sección.'} Probá actualizar en un momento.</p>
+        ) : !hayAlgo ? (
+          <p className="pz-vacio"><IconCircleCheck size={20} stroke={2} aria-hidden="true" /> {vacio || 'Todo al día'}</p>
+        ) : children}
+      </div>
       {pie && <div className="pz-pie">{pie}</div>}
     </section>
   );
@@ -159,6 +190,27 @@ export default function PizarraInicio() {
   const [aviso, setAviso] = useState('');
   const [marcando, setMarcando] = useState<Set<string>>(new Set());
   const pedido = useRef(0);                       // descarta respuestas viejas si se pisan dos cargas
+  const raizRef = useRef<HTMLElement>(null);
+  const tableroRef = useRef<HTMLDivElement>(null);
+  const hayDatos = data !== null;
+
+  // Cuánto alto le queda a la pizarra: se mide dónde arranca el tablero (cabecera, chips y barra de datos
+  // pueden cambiar de alto) y se lo pasa al CSS como variable. El CSS le resta lo de abajo y limita cada
+  // mosaico a lo que cabe en pantalla. Se escribe directo en el DOM: no hay render ni estado de por medio.
+  useEffect(() => {
+    const raiz = raizRef.current;
+    const tablero = tableroRef.current;
+    if (!raiz || !tablero) return;
+    const medir = () => {
+      const arriba = tablero.getBoundingClientRect().top + window.scrollY;
+      raiz.style.setProperty('--pz-arriba', `${Math.round(arriba)}px`);
+    };
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(document.body);
+    window.addEventListener('resize', medir);
+    return () => { ro.disconnect(); window.removeEventListener('resize', medir); };
+  }, [hayDatos]);
 
   // Carga manual (botones y re-sincronización): prende el spinner si se pide.
   const cargar = useCallback(async (refrescar = false, visible = false) => {
@@ -222,7 +274,7 @@ export default function PizarraInicio() {
   /* — Estados de carga y error: nunca rompen el resto del Inicio — */
   if (!data) {
     return (
-      <Marco ocupado={cargando}>
+      <Marco ocupado={cargando} raizRef={raizRef}>
         <h2 className="pz-titulo" id="pizarra-titulo">Pizarra</h2>
         {cargando ? (
           <p className="pz-cargando"><span className="spinner" /> Cargando pendientes…</p>
@@ -242,10 +294,59 @@ export default function PizarraInicio() {
   const docsHayAlgo = !docs.error && (docs.vencimientos.items.length > 0 || docs.pacientes.items.length > 0);
   const hayCorreo = correo.conectado || !!correo.error;   // la columna no existe si la casilla no está conectada
 
+  // Lo más urgente arriba de cada lista; en Documentación, además, primero la sección que tiene algo vencido.
+  const itemsTareas = urgentesPrimero(tareas.items);
+  const itemsVenc = urgentesPrimero(docs.vencimientos.items);
+  const itemsPac = urgentesPrimero(docs.pacientes.items);
+  const itemsMail = urgentesPrimero(correo.items ?? []);
+  const pacientesPrimero = !itemsVenc.some(v => v.nivel === 'ALTA') && itemsPac.some(p => p.nivel === 'ALTA');
+
+  const seccionVencimientos = !docs.error && itemsVenc.length > 0 && (
+    <>
+      <p className="pz-sub">Vencimientos</p>
+      <ul className="pz-lista">
+        {itemsVenc.map(v => (
+          <li className={`pz-item pz-item--${urgencia(v.nivel)}`} key={v.id}>
+            <div className="pz-item-main">
+              <p className="pz-item-titulo">{v.descripcion || v.tipo}</p>
+              <p className="pz-item-sub">{textoVence(v.diffDias)}{v.fechaVenc ? ` · ${v.fechaVenc}` : ''}{v.persona ? ` · ${v.persona}` : ''}</p>
+            </div>
+            <span className={`pz-etiqueta pz-etiqueta--${urgencia(v.nivel)}`}>{v.nivel === 'ALTA' ? 'Vencido' : 'Próximo'}</span>
+          </li>
+        ))}
+      </ul>
+      {docs.vencimientos.total > itemsVenc.length && <p className="pz-mas">y {docs.vencimientos.total - itemsVenc.length} más</p>}
+    </>
+  );
+  const seccionPacientes = !docs.error && itemsPac.length > 0 && (
+    <>
+      <p className="pz-sub">Legajos de pacientes</p>
+      <ul className="pz-lista">
+        {itemsPac.map(p => {
+          const partes = [
+            p.vencidos > 0 ? plural(p.vencidos, 'vencido', 'vencidos') : '',
+            p.faltantes > 0 ? plural(p.faltantes, 'faltante', 'faltantes') : '',
+            p.porVencer > 0 ? `${p.porVencer} por vencer` : '',
+          ].filter(Boolean).join(' · ');
+          return (
+            <li className={`pz-item pz-item--${urgencia(p.nivel)}`} key={p.beneficiarioId || p.beneficiario}>
+              <div className="pz-item-main">
+                <p className="pz-item-titulo">{p.beneficiario}</p>
+                <p className="pz-item-sub">{partes}{p.obraSocial ? ` · ${p.obraSocial}` : ''}</p>
+              </div>
+              <span className={`pz-etiqueta pz-etiqueta--${urgencia(p.nivel)}`}>{p.nivel === 'ALTA' ? 'Vencido' : 'Falta'}</span>
+            </li>
+          );
+        })}
+      </ul>
+      {docs.pacientes.total > itemsPac.length && <p className="pz-mas">y {docs.pacientes.total - itemsPac.length} pacientes más</p>}
+    </>
+  );
+
   return (
-    <Marco ocupado={cargando}>
+    <Marco ocupado={cargando} raizRef={raizRef}>
       <header className="pz-cabecera">
-        <div>
+        <div className="pz-cab-izq">
           <h2 className="pz-titulo" id="pizarra-titulo">Pizarra</h2>
           <p className="pz-resumen" aria-live="polite">
             {urgentes === 0 && pendientes === 0
@@ -267,9 +368,9 @@ export default function PizarraInicio() {
 
       {(fallo || aviso) && <p className="pz-aviso" role="status">{aviso || 'No se pudo actualizar. Se muestran los últimos datos.'}</p>}
 
-      <div className={`pz-tablero${hayCorreo ? '' : ' pz-sin-correo'}`}>
+      <div className={`pz-tablero${hayCorreo ? '' : ' pz-sin-correo'}`} ref={tableroRef}>
         {/* 1 · Km de choferes */}
-        <Mosaico clase="km" titulo="Km de choferes" icono={<IconRoute size={20} stroke={2} />} col={km} hayAlgo={kmHayAlgo}
+        <Mosaico clase="km" titulo="Km de choferes" icono={<IconRoute size={18} stroke={2} />} col={km} hayAlgo={kmHayAlgo}
           vacio={km.sinChoferes ? 'No hay choferes activos cargados.' : 'Todo al día'}
           pie={<Link className="pz-link" href="/dashboard/reportes-km">Abrir Reportes KM</Link>}>
           {km.anterior && km.anterior.faltan.length > 0 && (
@@ -309,11 +410,11 @@ export default function PizarraInicio() {
         </Mosaico>
 
         {/* 2 · Administración (agenda) */}
-        <Mosaico clase="adm" titulo="Administración" icono={<IconClipboardCheck size={20} stroke={2} />} col={tareas} hayAlgo={tareas.items.length > 0}
+        <Mosaico clase="adm" titulo="Administración" icono={<IconClipboardCheck size={18} stroke={2} />} col={tareas} hayAlgo={itemsTareas.length > 0}
           vacio={tareas.configuradas === 0 ? 'Todavía no hay tareas en la agenda.' : 'Todo al día'}
           pie={<Link className="pz-link" href="/dashboard/panel-admin">Abrir Panel administrativo</Link>}>
           <ul className="pz-lista">
-            {tareas.items.map(t => {
+            {itemsTareas.map(t => {
               const k = `${t.tareaId}_${t.periodo}`;
               return (
                 <li className={`pz-item pz-item--${urgencia(t.nivel)}`} key={k}>
@@ -329,67 +430,27 @@ export default function PizarraInicio() {
               );
             })}
           </ul>
-          {tareas.total > tareas.items.length && <p className="pz-mas">y {tareas.total - tareas.items.length} más en el panel</p>}
+          {tareas.total > itemsTareas.length && <p className="pz-mas">y {tareas.total - itemsTareas.length} más en el panel</p>}
         </Mosaico>
 
         {/* 3 · Documentación */}
-        <Mosaico clase="doc" titulo="Documentación" icono={<IconFiles size={20} stroke={2} />} col={docs} hayAlgo={docsHayAlgo}
+        <Mosaico clase="doc" titulo="Documentación" icono={<IconFiles size={18} stroke={2} />} col={docs} hayAlgo={docsHayAlgo}
           pie={<>
             <Link className="pz-link" href="/dashboard/vencimientos">Vencimientos</Link>
             <Link className="pz-link" href="/dashboard/legajos">Legajos</Link>
           </>}>
-          {!docs.error && docs.vencimientos.items.length > 0 && (
-            <>
-              <p className="pz-sub">Vencimientos</p>
-              <ul className="pz-lista">
-                {docs.vencimientos.items.map(v => (
-                  <li className={`pz-item pz-item--${urgencia(v.nivel)}`} key={v.id}>
-                    <div className="pz-item-main">
-                      <p className="pz-item-titulo">{v.descripcion || v.tipo}</p>
-                      <p className="pz-item-sub">{textoVence(v.diffDias)}{v.fechaVenc ? ` · ${v.fechaVenc}` : ''}{v.persona ? ` · ${v.persona}` : ''}</p>
-                    </div>
-                    <span className={`pz-etiqueta pz-etiqueta--${urgencia(v.nivel)}`}>{v.nivel === 'ALTA' ? 'Vencido' : 'Próximo'}</span>
-                  </li>
-                ))}
-              </ul>
-              {docs.vencimientos.total > docs.vencimientos.items.length && <p className="pz-mas">y {docs.vencimientos.total - docs.vencimientos.items.length} más</p>}
-            </>
-          )}
-          {!docs.error && docs.pacientes.items.length > 0 && (
-            <>
-              <p className="pz-sub">Legajos de pacientes</p>
-              <ul className="pz-lista">
-                {docs.pacientes.items.map(p => {
-                  const partes = [
-                    p.vencidos > 0 ? plural(p.vencidos, 'vencido', 'vencidos') : '',
-                    p.faltantes > 0 ? plural(p.faltantes, 'faltante', 'faltantes') : '',
-                    p.porVencer > 0 ? `${p.porVencer} por vencer` : '',
-                  ].filter(Boolean).join(' · ');
-                  return (
-                    <li className={`pz-item pz-item--${urgencia(p.nivel)}`} key={p.beneficiarioId || p.beneficiario}>
-                      <div className="pz-item-main">
-                        <p className="pz-item-titulo">{p.beneficiario}</p>
-                        <p className="pz-item-sub">{partes}{p.obraSocial ? ` · ${p.obraSocial}` : ''}</p>
-                      </div>
-                      <span className={`pz-etiqueta pz-etiqueta--${urgencia(p.nivel)}`}>{p.nivel === 'ALTA' ? 'Vencido' : 'Falta'}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-              {docs.pacientes.total > docs.pacientes.items.length && <p className="pz-mas">y {docs.pacientes.total - docs.pacientes.items.length} pacientes más</p>}
-            </>
-          )}
+          {pacientesPrimero ? <>{seccionPacientes}{seccionVencimientos}</> : <>{seccionVencimientos}{seccionPacientes}</>}
         </Mosaico>
 
         {/* 4 · Correo (la columna no existe si la casilla no está conectada) */}
         {hayCorreo && (
-          <Mosaico clase="cor" titulo="Correo" icono={<IconMail size={20} stroke={2} />} col={correo} hayAlgo={(correo.items?.length ?? 0) > 0 || !!correo.alerta}
+          <Mosaico clase="cor" titulo="Correo" icono={<IconMail size={18} stroke={2} />} col={correo} hayAlgo={itemsMail.length > 0 || !!correo.alerta}
             pie={<Link className="pz-link" href="/dashboard/correo">Abrir Correo</Link>}>
             {correo.alerta && (
               <p className={`pz-banner${correo.alerta.tipo === 'RECONEXION' ? ' pz-banner--alta' : ''}`}>{correo.alerta.mensaje}</p>
             )}
             <ul className="pz-lista">
-              {(correo.items ?? []).map(m => (
+              {itemsMail.map(m => (
                 <li className={`pz-item pz-item--${urgencia(m.nivel)}`} key={m.id}>
                   <div className="pz-item-main">
                     <p className="pz-item-titulo">{m.asunto || '(sin asunto)'}</p>
@@ -399,12 +460,12 @@ export default function PizarraInicio() {
                 </li>
               ))}
             </ul>
-            {(correo.total ?? 0) > (correo.items?.length ?? 0) && <p className="pz-mas">y {(correo.total ?? 0) - (correo.items?.length ?? 0)} más</p>}
+            {(correo.total ?? 0) > itemsMail.length && <p className="pz-mas">y {(correo.total ?? 0) - itemsMail.length} más</p>}
           </Mosaico>
         )}
 
         {/* 5 · Comprobantes sin foto */}
-        <Mosaico clase="com" titulo="Comprobantes" icono={<IconReceipt size={20} stroke={2} />} col={comprobantes} hayAlgo={comprobantes.items.length > 0}
+        <Mosaico clase="com" titulo="Comprobantes" icono={<IconReceipt size={18} stroke={2} />} col={comprobantes} hayAlgo={comprobantes.items.length > 0}
           vacio="Todo al día: los últimos 7 días tienen foto."
           pie={<>
             <Link className="pz-link" href="/dashboard/remitos">Remitos</Link>
