@@ -9,6 +9,8 @@ interface Mail {
   adjuntos: { nombre: string; tipo: string; tamano: number }[];
   categoria: string; resumen: string; accion: string; urgencia: 'ALTA' | 'MEDIA' | 'BAJA'; requiereAccion: boolean;
   pacienteId: string; pacienteNombre: string; clasificadoPor: 'regla' | 'ia'; link: string;
+  // Carpeta de la casilla de la que vino. Los mails guardados antes de las carpetas la traen como INBOX.
+  carpeta?: string;
   estado: 'NUEVO' | 'VISTO' | 'RESUELTO';
 }
 interface Reglas { trabajo: string[]; ignorar: string[]; palabrasClave: string[] }
@@ -17,10 +19,13 @@ interface Config {
   // 'oauth' = vinculada con un clic; 'password' = contraseña de aplicación.
   tipo?: 'oauth' | 'password' | '';
   requiereReconexion?: boolean;
+  // Carpetas de la casilla que se revisan (por defecto solo INBOX) y cuáles nunca se revisaron.
+  carpetas?: string[]; carpetasPendientes?: string[];
   activo?: boolean; usarIA?: boolean; ultimaSync?: string; error?: string; aviso?: string;
   stats?: { revisados: number; guardados: number; ignorados: number } | null;
   reglas: Reglas; iaDisponible: boolean; categorias: Record<string, string>;
 }
+interface CarpetaImap { path: string; nombre: string; especial: string; seleccionada: boolean; pendiente: boolean }
 interface ProveedorOauth { id: string; nombre: string; etiqueta: string; descripcion: string; habilitado: boolean }
 interface Contadores { NUEVO: number; ACCION: number; RESUELTO: number; total: number; porCategoria: Record<string, number> }
 type Vista = 'PENDIENTES' | 'ACCION' | 'NUEVO' | 'RESUELTO' | 'TODOS';
@@ -58,6 +63,12 @@ const ERRORES_OAUTH: Record<string, string> = {
 const mensajeOauth = (codigo: string) =>
   ERRORES_OAUTH[codigo] || 'No se pudo conectar la casilla. Probá de nuevo.';
 
+// Nombres legibles de las carpetas: INBOX y las que el servidor marca con un uso especial.
+const ESPECIAL: Record<string, string> = {
+  '\\Junk': 'Spam', '\\Trash': 'Papelera', '\\Sent': 'Enviados', '\\Drafts': 'Borradores', '\\Archive': 'Archivo', '\\All': 'Todos los mails',
+};
+const nombreCarpeta = (c?: string) => (!c || c === 'INBOX' ? 'Bandeja de entrada' : c);
+
 function fechaCorta(iso: string) {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
@@ -94,6 +105,14 @@ function ModalConfig({ cfg, onCerrar, onCambio }: { cfg: Config; onCerrar: () =>
   const [ocupado, setOcupado] = useState('');
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [oauth, setOauth] = useState<ProveedorOauth[]>([]);
+
+  // Carpetas de la casilla: cuáles existen, cuáles se revisan y cuáles nunca se revisaron.
+  const inicial = cfg.carpetas && cfg.carpetas.length ? cfg.carpetas : ['INBOX'];
+  const [carpetas, setCarpetas] = useState<CarpetaImap[] | null>(null);
+  const [elegidas, setElegidas] = useState<string[]>(inicial);
+  const [guardadas, setGuardadas] = useState<string[]>(inicial);
+  const [pendientes, setPendientes] = useState<string[]>(cfg.carpetasPendientes || []);
+  const [errCarpetas, setErrCarpetas] = useState('');
   // Si ya está conectada por contraseña, se abre directo en el formulario.
   const [verFormulario, setVerFormulario] = useState(cfg.conectado && cfg.tipo !== 'oauth');
   // Sin proveedores OAuth configurados, el formulario es el único camino y va siempre visible.
@@ -108,6 +127,51 @@ function ModalConfig({ cfg, onCerrar, onCambio }: { cfg: Config; onCerrar: () =>
       .catch(() => { /* sin OAuth: se usa contraseña de aplicación */ });
     return () => { vivo = false; };
   }, []);
+
+  // Pide a la casilla su lista real de carpetas (conecta por IMAP, puede tardar unos segundos).
+  useEffect(() => {
+    if (!cfg.conectado) return;
+    let vivo = true;
+    api.get('/api/correo/carpetas')
+      .then(r => {
+        if (!vivo) return;
+        const sel: string[] = r.data.seleccionadas?.length ? r.data.seleccionadas : ['INBOX'];
+        setCarpetas(r.data.carpetas || []); setElegidas(sel); setGuardadas(sel); setPendientes(r.data.pendientes || []);
+      })
+      .catch(e => { if (vivo) setErrCarpetas(mensajeError(e, 'No se pudieron leer las carpetas de la casilla')); });
+    return () => { vivo = false; };
+  }, [cfg.conectado]);
+
+  const alternarCarpeta = (path: string) =>
+    setElegidas(es => (es.includes(path) ? es.filter(x => x !== path) : [...es, path]));
+  const hayCambiosCarpetas = elegidas.length !== guardadas.length || elegidas.some(c => !guardadas.includes(c));
+
+  const guardarCarpetas = async () => {
+    setOcupado('carpetas'); setMsg(null);
+    try {
+      const r = await api.put('/api/correo/config/carpetas', { carpetas: elegidas });
+      const sel: string[] = r.data.carpetas || elegidas;
+      const nuevas: string[] = r.data.nuevas || [];
+      setGuardadas(sel); setElegidas(sel);
+      // Las recién agregadas quedan pendientes hasta revisarlas.
+      setPendientes(p => [...new Set([...p.filter(x => sel.includes(x)), ...nuevas])]);
+      setMsg({ text: nuevas.length ? 'Carpetas guardadas ✓ Falta revisar los últimos 30 días de las nuevas.' : 'Carpetas guardadas ✓', ok: true });
+      onCambio();
+    } catch (e) { setMsg({ text: mensajeError(e, 'No se pudieron guardar las carpetas'), ok: false }); }
+    setOcupado('');
+  };
+
+  // Lee de nuevo los últimos 30 días, pero solo de las carpetas que nunca se revisaron.
+  const revisarPendientes = async () => {
+    setOcupado('revisar'); setMsg(null);
+    try {
+      const r = await api.post('/api/correo/reescanear', { carpetas: pendientes });
+      setPendientes([]);
+      setMsg({ text: `Listo: ${r.data.revisados} revisados, ${r.data.guardados} nuevos de trabajo.${r.data.aviso ? ' ' + r.data.aviso : ''}`, ok: true });
+      onCambio();
+    } catch (e) { setMsg({ text: mensajeError(e, 'No se pudo revisar las carpetas'), ok: false }); }
+    setOcupado('');
+  };
 
   const vincular = async (id: string) => {
     setOcupado('oauth'); setMsg(null);
@@ -239,6 +303,53 @@ function ModalConfig({ cfg, onCerrar, onCambio }: { cfg: Config; onCerrar: () =>
 
         {cfg.conectado && (
           <>
+            {/* Carpetas: por defecto solo se lee la bandeja de entrada. Si los mails de trabajo
+                llegan a otra carpeta (por una regla de Outlook, por ejemplo), se tilda acá. */}
+            <p style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--text)', margin: '1.5rem 0 .25rem' }}>Carpetas a revisar</p>
+            <p style={{ fontSize: '.74rem', color: 'var(--text3)', marginBottom: '.6rem' }}>
+              Tildá las carpetas de la casilla donde llegan los mails de trabajo. Solo se leen, no se mueve ni se marca nada.
+            </p>
+            {errCarpetas ? (
+              <p style={{ fontSize: '.8rem', color: 'var(--red)' }}>{errCarpetas}</p>
+            ) : !carpetas ? (
+              <p style={{ fontSize: '.8rem', color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                <span className="spinner" style={{ width: 12, height: 12 }} />Leyendo las carpetas de la casilla…
+              </p>
+            ) : (
+              <>
+                <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '.4rem .6rem', maxHeight: 200, overflowY: 'auto' }}>
+                  {carpetas.map(cp => (
+                    <label key={cp.path} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.3rem 0', fontSize: '.84rem', color: 'var(--text2)', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={elegidas.includes(cp.path)} onChange={() => alternarCarpeta(cp.path)} disabled={!!ocupado} />
+                      <span style={{ flex: 1, wordBreak: 'break-word' }}>{cp.path === 'INBOX' ? 'Bandeja de entrada' : cp.path}</span>
+                      {ESPECIAL[cp.especial] && <span className="badge badge-gray">{ESPECIAL[cp.especial]}</span>}
+                      {pendientes.includes(cp.path) && <span className="badge badge-amber">sin revisar</span>}
+                    </label>
+                  ))}
+                </div>
+                {elegidas.length === 0 && (
+                  <p style={{ fontSize: '.76rem', color: 'var(--red)', marginTop: '.4rem' }}>Elegí al menos una carpeta.</p>
+                )}
+                <div style={{ display: 'flex', gap: '.5rem', marginTop: '.6rem', flexWrap: 'wrap' }}>
+                  <button className="btn btn-primary" onClick={guardarCarpetas} disabled={!!ocupado || !hayCambiosCarpetas || elegidas.length === 0}>
+                    {ocupado === 'carpetas' ? <><span className="spinner" style={{ width: 12, height: 12 }} />Guardando…</> : 'Guardar carpetas'}
+                  </button>
+                  {pendientes.length > 0 && (
+                    <button className="btn btn-secondary" onClick={revisarPendientes} disabled={!!ocupado || hayCambiosCarpetas}
+                      title={hayCambiosCarpetas ? 'Guardá las carpetas primero' : undefined}>
+                      {ocupado === 'revisar' ? <><span className="spinner" style={{ width: 12, height: 12 }} />Revisando…</> : 'Revisar últimos 30 días'}
+                    </button>
+                  )}
+                </div>
+                {pendientes.length > 0 && (
+                  <p style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.4rem' }}>
+                    {hayCambiosCarpetas ? 'Guardá los cambios para poder revisar las carpetas nuevas. ' : ''}
+                    Sin revisar todavía: {pendientes.map(p => nombreCarpeta(p)).join(', ')}. Si no apretás el botón, se leen solas en la próxima sincronización.
+                  </p>
+                )}
+              </>
+            )}
+
             <p style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--text)', margin: '1.5rem 0 .25rem' }}>Qué cuenta como trabajo</p>
             <p style={{ fontSize: '.74rem', color: 'var(--text3)', marginBottom: '.6rem' }}>
               Las reglas mandan primero. Lo que las reglas no definen lo decide {cfg.iaDisponible ? 'la IA' : 'la lista de palabras clave'}.
@@ -472,6 +583,7 @@ export default function CorreoPage() {
                           <span className="badge badge-blue">{cats[m.categoria] || m.categoria}</span>
                           {urg.label && m.estado !== 'RESUELTO' && <span className={`badge ${m.urgencia === 'ALTA' ? 'badge-red' : 'badge-amber'}`}>{urg.label}</span>}
                           {m.pacienteNombre && <span className="badge badge-purple">👤 {m.pacienteNombre}</span>}
+                          <span className="badge badge-gray">📁 {nombreCarpeta(m.carpeta)}</span>
                           {m.adjuntos?.length > 0 && <span className="badge badge-gray">📎 {m.adjuntos.length}</span>}
                           {m.estado === 'RESUELTO' && <span className="badge badge-green">Resuelto</span>}
                         </div>
@@ -481,6 +593,7 @@ export default function CorreoPage() {
                       <div style={{ marginTop: '.75rem', paddingTop: '.75rem', borderTop: '1px solid var(--border)' }}>
                         <p style={{ fontSize: '.74rem', color: 'var(--text3)', marginBottom: '.4rem' }}>
                           De: {m.deNombre ? `${m.deNombre} <${m.de}>` : m.de} · {new Date(m.fecha).toLocaleString('es-AR')}
+                          {' · '}Carpeta: {nombreCarpeta(m.carpeta)}
                           {' · '}{m.clasificadoPor === 'ia' ? 'clasificado por IA' : 'clasificado por regla'}
                         </p>
                         <p style={{ fontSize: '.82rem', color: 'var(--text2)', whiteSpace: 'pre-wrap', maxHeight: 260, overflowY: 'auto', lineHeight: 1.5 }}>{m.extracto || '(sin texto)'}</p>
