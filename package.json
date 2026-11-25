@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --no-warnings --test \"tests/*.test.mjs\""
   },
   "dependencies": {
     "@afipsdk/afip.js": "^1.2.3",
