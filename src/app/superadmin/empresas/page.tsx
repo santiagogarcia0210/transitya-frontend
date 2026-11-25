@@ -45,6 +45,8 @@ export default function EmpresasPage() {
   const [detalle,  setDetalle]  = useState<EmpresaDetalle | null>(null);
   const [detalleId, setDetalleId] = useState('');
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [guardandoOauth, setGuardandoOauth] = useState(false);
+  const [msgOauth, setMsgOauth] = useState<{text:string;ok:boolean}|null>(null);
   const [accionMsg, setAccionMsg] = useState('');
   const [toggling, setToggling] = useState<Set<string>>(new Set());
   const [confirmToggle, setConfirmToggle] = useState<{ empresa: Empresa; motivo: string } | null>(null);
@@ -70,12 +72,27 @@ export default function EmpresasPage() {
   });
 
   const verDetalle = async (tenantId: string) => {
-    setDetalleId(tenantId); setLoadingDetalle(true);
+    setDetalleId(tenantId); setLoadingDetalle(true); setMsgOauth(null);
     try {
       const r = await api.get(`/api/superadmin/empresas/${tenantId}`);
       setDetalle({ empresa: r.data.empresa, suscripcion: r.data.suscripcion, features: r.data.features, limites: r.data.limites });
     } catch { /* silent */ }
     setLoadingDetalle(false);
+  };
+
+  // Interruptor del botón "Conectar con Google" para esta empresa. El campo vive en
+  // el documento de la empresa, no en config/features, que se reescribe entero al
+  // cambiar de plan.
+  const toggleOauthGoogle = async (habilitado: boolean) => {
+    setGuardandoOauth(true); setMsgOauth(null);
+    try {
+      await api.put(`/api/superadmin/empresas/${detalleId}/correo-oauth`, { oauthGoogleHabilitado: habilitado });
+      setDetalle(d => d ? { ...d, empresa: { ...d.empresa, oauthGoogleHabilitado: habilitado } } : d);
+      setMsgOauth({ text: habilitado ? 'Botón de Google habilitado ✓' : 'Botón de Google oculto para esta empresa ✓', ok: true });
+    } catch {
+      setMsgOauth({ text: 'No se pudo guardar. Probá de nuevo.', ok: false });
+    }
+    setGuardandoOauth(false);
   };
 
   const toggleEstado = async (empresa: Empresa, motivo?: string) => {
@@ -329,6 +346,34 @@ export default function EmpresasPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Correo por OAuth. Google exige verificación para el scope restringido
+                    https://mail.google.com/, así que hasta que la app esté verificada el
+                    botón se habilita empresa por empresa (solo las cuentas agregadas como
+                    usuarios de prueba en Google funcionan). Microsoft va para todas. */}
+                <div style={{ borderTop:'1px solid var(--border)', paddingTop:'1rem' }}>
+                  <div style={{ fontSize:'.72rem', fontWeight:700, color:'var(--text3)', textTransform:'uppercase',
+                    letterSpacing:'.06em', marginBottom:'.5rem' }}>Correo · Conectar con Google</div>
+                  <label style={{ display:'flex', gap:'.5rem', alignItems:'flex-start', fontSize:'.82rem', color:'var(--text2)' }}>
+                    <input
+                      type="checkbox"
+                      checked={detalle.empresa.oauthGoogleHabilitado === true}
+                      disabled={guardandoOauth}
+                      onChange={e => toggleOauthGoogle(e.target.checked)}
+                      style={{ marginTop: 3 }}
+                    />
+                    <span>
+                      Mostrar el botón &quot;Conectar con Google&quot; a esta empresa
+                      <span style={{ display:'block', fontSize:'.72rem', color:'var(--text3)' }}>
+                        Solo para empresas cuyas cuentas estén agregadas como usuarios de prueba en Google.
+                        El botón de Microsoft y la contraseña de aplicación no dependen de esto.
+                      </span>
+                    </span>
+                  </label>
+                  {msgOauth && (
+                    <p style={{ fontSize:'.78rem', marginTop:'.4rem', color: msgOauth.ok ? 'var(--green)' : 'var(--red)' }}>{msgOauth.text}</p>
+                  )}
+                </div>
 
                 <div style={{ display:'flex', gap:'.75rem', marginTop:'.5rem' }}>
                   <button className="btn btn-secondary" style={{ flex:1 }}

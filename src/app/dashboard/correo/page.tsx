@@ -51,6 +51,7 @@ const ERRORES_OAUTH: Record<string, string> = {
   imap_rechazado: 'La cuenta se autorizó, pero el servidor rechazó el acceso IMAP. En Microsoft 365 de empresa el administrador tiene que habilitar IMAP.',
   proveedor_invalido: 'Ese proveedor no existe.',
   proveedor_deshabilitado: 'Ese proveedor no está configurado en el servidor. Podés conectar con contraseña de aplicación.',
+  proveedor_no_habilitado_para_la_empresa: 'La conexión con ese proveedor todavía no está habilitada para tu empresa. Podés conectar con contraseña de aplicación.',
   cifrado_no_disponible: 'El módulo de correo está deshabilitado en el servidor. Avisale a soporte.',
   error_interno: 'Hubo un problema al conectar la casilla. Probá de nuevo.',
 };
@@ -186,15 +187,24 @@ function ModalConfig({ cfg, onCerrar, onCambio }: { cfg: Config; onCerrar: () =>
               Te lleva a la pantalla de {oauth.map(p => p.nombre).join(' o ')} para autorizar el acceso de solo lectura. No hace falta generar ninguna contraseña.
             </p>
             {!verFormulario && (
-              <button
-                onClick={() => setVerFormulario(true)}
-                style={{
-                  marginTop: '.75rem', background: 'none', border: 'none', padding: 0,
-                  color: 'var(--text3)', fontSize: '.78rem', textDecoration: 'underline', cursor: 'pointer',
-                }}
-              >
-                Usar contraseña de aplicación (otro proveedor)
-              </button>
+              <div style={{ marginTop: '.9rem', paddingTop: '.75rem', borderTop: '1px solid var(--border)' }}>
+                <button
+                  onClick={() => setVerFormulario(true)}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    color: 'var(--text2)', fontSize: '.82rem', fontWeight: 600,
+                    textDecoration: 'underline', cursor: 'pointer',
+                  }}
+                >
+                  Usar contraseña de aplicación (otro proveedor)
+                </button>
+                <p style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.35rem' }}>
+                  Para Yahoo, un hosting propio, o si tu casilla de Google o Microsoft no se puede
+                  autorizar con los botones de arriba. Funciona con cualquier casilla que tenga IMAP:
+                  se genera una clave de 16 letras en la cuenta de mail y se pega acá, sin usar la
+                  contraseña normal.
+                </p>
+              </div>
             )}
           </div>
         )}
