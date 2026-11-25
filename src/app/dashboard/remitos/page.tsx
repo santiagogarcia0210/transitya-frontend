@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import { fechaDMY, fechaISO, ordenarPorFechaDesc } from '@/lib/fechas';
 import Button from '@/components/ui/Button';
 
 const TIPOS_COMB    = ['Nafta Super', 'Nafta Premium', 'Diesel', 'Gasoil', 'GNC', 'Otro'];
@@ -48,7 +49,9 @@ interface FormState {
 function normalizar(e: Record<string, unknown>): Remito {
   return {
     id:             String(e.id             || ''),
-    fecha:          String(e.fecha          || e.FECHA          || ''),
+    // Siempre dd/MM/yyyy, aunque el servidor la devuelva en ISO (documentos viejos). Si no se
+    // entiende queda el texto original, para que se vea que hay algo para corregir.
+    fecha:          fechaDMY(e.fecha        || e.FECHA          || ''),
     nroRemito:      String(e.nroRemito      || e.NROREMITO      || e['NRO REMITO']      || e.nro_remito      || ''),
     razonSocial:    String(e.razonSocial    || e.RAZONSOCIAL    || e['RAZON SOCIAL']    || e.razon_social    || ''),
     cuit:           String(e.cuit           || e.CUIT           || ''),
@@ -67,13 +70,6 @@ const labelStyle: React.CSSProperties = {
 
 const fmt = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
-
-const fechaISO = (v: string) => {
-  if (!v) return '';
-  const iso = v.includes('/') ? v.split('/').reverse().join('-') : v;
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
-};
 
 const EMPTY: FormState = {
   id: '', fecha: '', nroRemito: '', razonSocial: '',
@@ -118,7 +114,8 @@ export default function RemitosPage() {
     setLoading(true);
     try {
       const r = await api.get('/api/remitos');
-      setLista(toArray(r.data).map(serializarFirestore).map(normalizar));
+      // El servidor ya la manda ordenada; se reordena acá por si algún documento llegó en otro formato.
+      setLista(ordenarPorFechaDesc(toArray(r.data).map(serializarFirestore).map(normalizar)));
     } catch { /* silent */ }
     setLoading(false);
   };
@@ -136,8 +133,13 @@ export default function RemitosPage() {
     const q = filtroBusq.toLowerCase();
     if (q && !r.razonSocial.toLowerCase().includes(q) && !r.nroRemito.toLowerCase().includes(q) && !r.cuit.includes(q)) return false;
     if (filtroChofer && r.chofer !== filtroChofer) return false;
-    if (filtroDesde && r.fecha < filtroDesde) return false;
-    if (filtroHasta && r.fecha > filtroHasta) return false;
+    // r.fecha es dd/MM/yyyy y el input date da yyyy-MM-dd: se comparan como ISO (como texto no tiene sentido).
+    if (filtroDesde || filtroHasta) {
+      const f = fechaISO(r.fecha);
+      if (!f) return false;                   // sin fecha válida no se puede ubicar en un rango
+      if (filtroDesde && f < filtroDesde) return false;
+      if (filtroHasta && f > filtroHasta) return false;
+    }
     return true;
   });
 
@@ -270,12 +272,16 @@ export default function RemitosPage() {
       if (pdfDesde)  params.set('desde', pdfDesde);
       if (pdfHasta)  params.set('hasta', pdfHasta);
       const r = await api.get(`/api/remitos/pdf-data?${params}`);
-      setPdfData(toArray(r.data).map(serializarFirestore).map(normalizar));
+      setPdfData(ordenarPorFechaDesc(toArray(r.data).map(serializarFirestore).map(normalizar)));
     } catch { /* fallback: filter from lista */
       setPdfData(lista.filter(r => {
         if (pdfChofer && r.chofer !== pdfChofer) return false;
-        if (pdfDesde  && r.fecha < pdfDesde) return false;
-        if (pdfHasta  && r.fecha > pdfHasta) return false;
+        if (pdfDesde || pdfHasta) {
+          const f = fechaISO(r.fecha);
+          if (!f) return false;
+          if (pdfDesde && f < pdfDesde) return false;
+          if (pdfHasta && f > pdfHasta) return false;
+        }
         return true;
       }));
     }
@@ -371,7 +377,7 @@ export default function RemitosPage() {
                   {r.tipoCombustible && <span className="badge badge-amber">{r.tipoCombustible}</span>}
                 </div>
                 <p style={{ fontSize: '.78rem', color: 'var(--text3)', marginTop: '.15rem' }}>
-                  {r.fecha}
+                  {fechaDMY(r.fecha)}
                   {r.chofer    && ` · ${r.chofer}`}
                   {r.cuit      && ` · ${r.cuit}`}
                   {r.combustible > 0 && ` · ${r.combustible} L`}
@@ -604,7 +610,7 @@ export default function RemitosPage() {
                   <tbody>
                     {pdfData.map(r=>(
                       <tr key={r.id}>
-                        <td style={{ border:'1px solid var(--border)', padding:'.45rem .75rem' }}>{r.fecha}</td>
+                        <td style={{ border:'1px solid var(--border)', padding:'.45rem .75rem' }}>{fechaDMY(r.fecha)}</td>
                         <td style={{ border:'1px solid var(--border)', padding:'.45rem .75rem', fontFamily:'monospace' }}>{r.nroRemito||'—'}</td>
                         <td style={{ border:'1px solid var(--border)', padding:'.45rem .75rem', fontWeight:500 }}>{r.razonSocial||'—'}</td>
                         <td style={{ border:'1px solid var(--border)', padding:'.45rem .75rem', fontFamily:'monospace', fontSize:'.78rem' }}>{r.cuit||'—'}</td>

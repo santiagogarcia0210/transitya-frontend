@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import { fechaDMY, fechaISO, normalizarFecha, ordenarPorFechaDesc } from '@/lib/fechas';
 import Button from '@/components/ui/Button';
 import { exportarEgresosMensualPDF } from '@/lib/pdfResumen';
 
@@ -28,7 +29,9 @@ const EMPTY: FormState = {
 function normalizar(e: Record<string, unknown>): Egreso {
   return {
     id:           String(e.id || ''),
-    fecha:        String(e.fecha        || e.FECHA        || ''),
+    // Siempre dd/MM/yyyy, aunque el servidor la devuelva en ISO (documentos viejos). Si no se
+    // entiende queda el texto original, para que se vea que hay algo para corregir.
+    fecha:        fechaDMY(e.fecha      || e.FECHA        || ''),
     concepto:     String(e.concepto     || e.CONCEPTO     || ''),
     monto:        parseFloat(String(e.monto || e.MONTO || e.IMPORTE || e.TOTAL || 0)) || 0,
     categoria:    String(e.categoria    || e.CATEGORIA    || 'Otro'),
@@ -53,13 +56,6 @@ const L: React.CSSProperties = {
 
 const fmt = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
-
-const fechaISO = (v: string) => {
-  if (!v) return '';
-  const iso = v.includes('/') ? v.split('/').reverse().join('-') : v;
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
-};
 
 export default function EgresosPage() {
   const [tab,            setTab]            = useState<TabEgr>('carga');
@@ -104,7 +100,8 @@ export default function EgresosPage() {
     setLoading(true);
     try {
       const r = await api.get('/api/egresos');
-      setLista(toArray(r.data).map(serializarFirestore).map(normalizar));
+      // El servidor ya la manda ordenada; se reordena acá por si algún documento llegó en otro formato.
+      setLista(ordenarPorFechaDesc(toArray(r.data).map(serializarFirestore).map(normalizar)));
     } catch { /* silent */ }
     setLoading(false);
   };
@@ -131,8 +128,13 @@ export default function EgresosPage() {
              !e.proveedor.toLowerCase().includes(q) &&
              !e.chofer.toLowerCase().includes(q) &&
              !e.observaciones.toLowerCase().includes(q)) return false;
-    if (filtroDesde && e.fecha < filtroDesde) return false;
-    if (filtroHasta && e.fecha > filtroHasta) return false;
+    // e.fecha es dd/MM/yyyy y el input date da yyyy-MM-dd: se comparan como ISO (como texto no tiene sentido).
+    if (filtroDesde || filtroHasta) {
+      const f = fechaISO(e.fecha);
+      if (!f) return false;                   // sin fecha válida no se puede ubicar en un rango
+      if (filtroDesde && f < filtroDesde) return false;
+      if (filtroHasta && f > filtroHasta) return false;
+    }
     if (filtroMontoMin && e.monto < Number(filtroMontoMin)) return false;
     if (filtroMontoMax && e.monto > Number(filtroMontoMax)) return false;
     if (filtroCateg && e.categoria !== filtroCateg) return false;
@@ -194,7 +196,8 @@ export default function EgresosPage() {
     }
     if (!forzar && !form.id) {
       try {
-        const r = await api.get(`/api/egresos/duplicado?fecha=${encodeURIComponent(form.fecha)}&monto=${form.monto}`);
+        // form.fecha es ISO (input date); el servidor guarda y compara dd/MM/yyyy.
+        const r = await api.get(`/api/egresos/duplicado?fecha=${encodeURIComponent(normalizarFecha(form.fecha))}&monto=${form.monto}`);
         if (r.data?.duplicado) { setDupWarning(true); return; }
       } catch { /* endpoint opcional */ }
     }
@@ -213,7 +216,11 @@ export default function EgresosPage() {
         setForm(EMPTY); setArchivo(null); setPreviewUrl('');
       }
       cargar();
-    } catch { setMsgCarga({ text: 'Error al guardar', ok: false }); }
+    } catch (e: unknown) {
+      // El servidor responde 400 con un mensaje claro (por ejemplo, fecha inválida): se muestra.
+      const msg = (e as { response?: { data?: { mensaje?: string } } })?.response?.data?.mensaje;
+      setMsgCarga({ text: msg || 'Error al guardar', ok: false });
+    }
     setSaving(false);
   };
 
@@ -482,7 +489,7 @@ export default function EgresosPage() {
                           <span style={{ fontWeight:700, color:'var(--red)', fontSize:'.95rem', flexShrink:0 }}>{fmt(e.monto)}</span>
                         </div>
                         <div className="result-meta">
-                          {e.fecha      && <span>{e.fecha}</span>}
+                          {e.fecha      && <span>{fechaDMY(e.fecha)}</span>}
                           {e.categoria  && <span className="badge badge-amber" style={{fontSize:'.68rem'}}>{e.categoria}</span>}
                           {e.proveedor  && <span>{e.proveedor}</span>}
                           {e.chofer     && <span>🚗 {e.chofer}</span>}
