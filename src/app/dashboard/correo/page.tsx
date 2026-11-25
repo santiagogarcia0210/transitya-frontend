@@ -14,10 +14,14 @@ interface Mail {
 interface Reglas { trabajo: string[]; ignorar: string[]; palabrasClave: string[] }
 interface Config {
   conectado: boolean; user?: string; host?: string; port?: number; secure?: boolean; proveedor?: string;
+  // 'oauth' = vinculada con un clic; 'password' = contraseña de aplicación.
+  tipo?: 'oauth' | 'password' | '';
+  requiereReconexion?: boolean;
   activo?: boolean; usarIA?: boolean; ultimaSync?: string; error?: string; aviso?: string;
   stats?: { revisados: number; guardados: number; ignorados: number } | null;
   reglas: Reglas; iaDisponible: boolean; categorias: Record<string, string>;
 }
+interface ProveedorOauth { id: string; nombre: string; etiqueta: string; descripcion: string; habilitado: boolean }
 interface Contadores { NUEVO: number; ACCION: number; RESUELTO: number; total: number; porCategoria: Record<string, number> }
 type Vista = 'PENDIENTES' | 'ACCION' | 'NUEVO' | 'RESUELTO' | 'TODOS';
 
@@ -33,6 +37,25 @@ const PROVEEDORES: Record<string, { label: string; host: string; port: number; a
 };
 
 const URG_UI = { ALTA: { color: 'var(--red)', label: 'Urgente' }, MEDIA: { color: 'var(--amber)', label: 'Media' }, BAJA: { color: 'var(--text3)', label: '' } };
+
+// El backend vuelve con ?error=<codigo> genérico, nunca con el texto del proveedor.
+// Acá se traduce a algo que el usuario pueda entender y accionar.
+const ERRORES_OAUTH: Record<string, string> = {
+  permiso_denegado: 'Se canceló el permiso en la pantalla de Google o Microsoft. Si querés conectar la casilla, hay que aceptar el acceso.',
+  state_invalido: 'El enlace de conexión no era válido. Volvé a apretar el botón para empezar de nuevo.',
+  state_vencido: 'El enlace de conexión venció (dura 10 minutos). Volvé a apretar el botón.',
+  state_usado: 'Ese enlace de conexión ya se usó. Volvé a apretar el botón para empezar de nuevo.',
+  intercambio_fallido: 'El proveedor no confirmó el permiso. Probá de nuevo en unos minutos.',
+  sin_refresh_token: 'El proveedor no dio un permiso duradero. Volvé a intentar y aceptá todos los accesos que pide la pantalla.',
+  no_se_pudo_leer_el_mail: 'No se pudo leer la dirección de la cuenta. Probá de nuevo o conectá con contraseña de aplicación.',
+  imap_rechazado: 'La cuenta se autorizó, pero el servidor rechazó el acceso IMAP. En Microsoft 365 de empresa el administrador tiene que habilitar IMAP.',
+  proveedor_invalido: 'Ese proveedor no existe.',
+  proveedor_deshabilitado: 'Ese proveedor no está configurado en el servidor. Podés conectar con contraseña de aplicación.',
+  cifrado_no_disponible: 'El módulo de correo está deshabilitado en el servidor. Avisale a soporte.',
+  error_interno: 'Hubo un problema al conectar la casilla. Probá de nuevo.',
+};
+const mensajeOauth = (codigo: string) =>
+  ERRORES_OAUTH[codigo] || 'No se pudo conectar la casilla. Probá de nuevo.';
 
 function fechaCorta(iso: string) {
   const d = new Date(iso);
@@ -69,6 +92,33 @@ function ModalConfig({ cfg, onCerrar, onCambio }: { cfg: Config; onCerrar: () =>
   const [usarIA, setUsarIA] = useState(cfg.usarIA !== false);
   const [ocupado, setOcupado] = useState('');
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [oauth, setOauth] = useState<ProveedorOauth[]>([]);
+  // Si ya está conectada por contraseña, se abre directo en el formulario.
+  const [verFormulario, setVerFormulario] = useState(cfg.conectado && cfg.tipo !== 'oauth');
+  // Sin proveedores OAuth configurados, el formulario es el único camino y va siempre visible.
+  const mostrarForm = oauth.length === 0 || verFormulario;
+
+  // Qué proveedores ofrece el servidor. Si la llamada falla o no hay ninguno
+  // habilitado, queda solo la contraseña de aplicación y la pantalla sirve igual.
+  useEffect(() => {
+    let vivo = true;
+    api.get('/api/correo/oauth/proveedores')
+      .then(r => { if (vivo) setOauth((r.data.proveedores || []).filter((p: ProveedorOauth) => p.habilitado)); })
+      .catch(() => { /* sin OAuth: se usa contraseña de aplicación */ });
+    return () => { vivo = false; };
+  }, []);
+
+  const vincular = async (id: string) => {
+    setOcupado('oauth'); setMsg(null);
+    try {
+      const r = await api.post(`/api/correo/oauth/${id}/iniciar`);
+      // Se sale de la app hacia el proveedor; vuelve al dashboard con ?conectado=1.
+      window.location.assign(r.data.url);
+    } catch (e) {
+      setMsg({ text: mensajeError(e, 'No se pudo abrir la pantalla del proveedor'), ok: false });
+      setOcupado('');
+    }
+  };
 
   const elegirProv = (p: string) => { setProv(p); if (PROVEEDORES[p].host) setHost(PROVEEDORES[p].host); setPort(String(PROVEEDORES[p].port)); };
 
@@ -117,6 +167,40 @@ function ModalConfig({ cfg, onCerrar, onCambio }: { cfg: Config; onCerrar: () =>
         </div>
 
         <p style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--text)', marginBottom: '.5rem' }}>Casilla</p>
+
+        {/* Camino recomendado: un clic, sin contraseña de aplicación. Solo aparecen
+            los proveedores que el servidor tiene configurados. */}
+        {oauth.length > 0 && (
+          <div style={{ marginBottom: verFormulario ? '1rem' : 0 }}>
+            <div style={{ display: 'grid', gap: '.5rem' }}>
+              {oauth.map(p => (
+                <button key={p.id} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => vincular(p.id)} disabled={!!ocupado}>
+                  {ocupado === 'oauth'
+                    ? <><span className="spinner" style={{ width: 12, height: 12 }} />Abriendo {p.nombre}…</>
+                    : p.etiqueta}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.5rem' }}>
+              Te lleva a la pantalla de {oauth.map(p => p.nombre).join(' o ')} para autorizar el acceso de solo lectura. No hace falta generar ninguna contraseña.
+            </p>
+            {!verFormulario && (
+              <button
+                onClick={() => setVerFormulario(true)}
+                style={{
+                  marginTop: '.75rem', background: 'none', border: 'none', padding: 0,
+                  color: 'var(--text3)', fontSize: '.78rem', textDecoration: 'underline', cursor: 'pointer',
+                }}
+              >
+                Usar contraseña de aplicación (otro proveedor)
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Alternativa de siempre: IMAP con contraseña de aplicación. */}
+        {mostrarForm && (<>
         <div className="form-grid">
           <div><label style={LABEL}>Proveedor</label>
             <select className="select" value={prov} onChange={e => elegirProv(e.target.value)}>
@@ -141,6 +225,7 @@ function ModalConfig({ cfg, onCerrar, onCambio }: { cfg: Config; onCerrar: () =>
         <button className="btn btn-primary" style={{ marginTop: '.75rem', width: '100%' }} onClick={conectar} disabled={!!ocupado}>
           {ocupado === 'conectar' ? <><span className="spinner" style={{ width: 12, height: 12 }} />Probando conexión…</> : cfg.conectado ? 'Guardar casilla' : 'Conectar'}
         </button>
+        </>)}
 
         {cfg.conectado && (
           <>
@@ -194,6 +279,7 @@ export default function CorreoPage() {
   const [sync, setSync] = useState(false);
   const [aviso, setAviso] = useState<{ text: string; ok: boolean } | null>(null);
   const [verConfig, setVerConfig] = useState(false);
+  const [reconectando, setReconectando] = useState(false);
 
   const aplicar = useCallback(([rc, rm]: Awaited<ReturnType<typeof pedir>>) => {
     setCfg(rc.data); setMails(rm.data.mails || []); setCont(rm.data.contadores); setCats(rm.data.categorias || {});
@@ -210,6 +296,39 @@ export default function CorreoPage() {
     }, busq ? 300 : 0);
     return () => { vivo = false; clearTimeout(t); };
   }, [authLoading, vista, categoria, busq, aplicar]);
+
+  // Vuelta del proveedor de OAuth: el backend redirige acá con ?conectado=1 o
+  // ?error=<codigo>. Se lee de window.location en vez de useSearchParams porque
+  // esta página se prerenderiza estática y useSearchParams exigiría envolverla en
+  // <Suspense> (si no, falla el build de producción).
+  // El aviso se setea diferido, como el resto de los efectos de este archivo.
+  useEffect(() => {
+    if (authLoading) return;
+    const p = new URLSearchParams(window.location.search);
+    const conectado = p.get('conectado');
+    const error = p.get('error');
+    if (!conectado && !error) return;
+    // Se limpia la URL para que al recargar no vuelva a aparecer el cartel.
+    window.history.replaceState({}, '', window.location.pathname);
+    const t = setTimeout(() => {
+      setAviso(conectado
+        ? { text: 'Casilla conectada ✓ Ya se están leyendo los mails de trabajo de los últimos 30 días.', ok: true }
+        : { text: mensajeOauth(String(error)), ok: false });
+    }, 0);
+    return () => clearTimeout(t);
+  }, [authLoading]);
+
+  // Reconexión: arranca de nuevo el mismo flujo de OAuth con el proveedor guardado.
+  const reconectar = async () => {
+    setReconectando(true); setAviso(null);
+    try {
+      const r = await api.post(`/api/correo/oauth/${cfg?.proveedor}/iniciar`);
+      window.location.assign(r.data.url);
+    } catch (e) {
+      setAviso({ text: mensajeError(e, 'No se pudo abrir la pantalla del proveedor'), ok: false });
+      setReconectando(false);
+    }
+  };
 
   const sincronizar = async () => {
     setSync(true); setAviso(null);
@@ -264,7 +383,21 @@ export default function CorreoPage() {
         </div>
       </div>
 
-      {cfg?.error && (
+      {/* Se cortó el permiso de OAuth (lo revocaron o venció): no hay nada que
+          reintentar solo, hace falta autorizar de nuevo. */}
+      {cfg?.requiereReconexion && (
+        <div className="card" style={{ padding: '.8rem 1rem', marginBottom: '1rem', borderColor: 'var(--amber)' }}>
+          <p style={{ fontSize: '.84rem', color: 'var(--text)', fontWeight: 600 }}>Hay que volver a autorizar la casilla</p>
+          <p style={{ fontSize: '.8rem', color: 'var(--text3)', margin: '.25rem 0 .6rem' }}>
+            {cfg.error || 'Se cortó el permiso de acceso a la casilla.'} Mientras tanto no entran mails nuevos.
+          </p>
+          <button className="btn btn-primary" onClick={reconectar} disabled={reconectando}>
+            {reconectando ? <><span className="spinner" style={{ width: 12, height: 12 }} />Abriendo…</> : 'Reconectar'}
+          </button>
+        </div>
+      )}
+
+      {cfg?.error && !cfg.requiereReconexion && (
         <div className="card" style={{ padding: '.8rem 1rem', marginBottom: '1rem', borderColor: 'var(--red)' }}>
           <p style={{ fontSize: '.84rem', color: 'var(--red)' }}>No se pudo leer el correo: {cfg.error}</p>
         </div>
