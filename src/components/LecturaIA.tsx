@@ -1,10 +1,11 @@
 'use client';
 import { useRef, useState } from 'react';
-import { IconAlertTriangle, IconCamera, IconCheck, IconFileTypePdf, IconPhoto, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCamera, IconCheck, IconFileTypePdf, IconLock, IconPhoto, IconX } from '@tabler/icons-react';
+import CamposClinicos from '@/components/CamposClinicos';
 import api from '@/lib/api';
 import { LABEL, OVERLAY, mensajeError, type Requisito } from '@/lib/administrativo';
 import {
-  ErrorArchivo, esBaja, etiquetaConfianza, itemConfirmar, prepararArchivo, propuestaDe, puedeConfirmar, separarResultados,
+  ErrorArchivo, TITULO_DOC_CLINICO, esBaja, etiquetaConfianza, itemConfirmar, prepararArchivo, propuestaDe, puedeConfirmar, separarResultados,
   type Confianza, type LecturaError, type LecturaOk, type Propuesta,
 } from '@/lib/lecturaIA';
 
@@ -133,6 +134,23 @@ function TarjetaPropuesta({ p, requisitos, onCambio, onConfirmar, onDescartar, b
             </Dato>
           </div>
 
+          {p.clinico && (
+            <div style={{ marginTop: '.9rem', padding: '.85rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg4)' }}>
+              <p style={{ fontSize: '.84rem', fontWeight: 700, color: 'var(--text)', display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+                <IconLock size={16} /> Datos clínicos · {TITULO_DOC_CLINICO[p.clinico.documento]}
+              </p>
+              <p style={{ fontSize: '.74rem', color: 'var(--text3)', margin: '.2rem 0 .75rem' }}>
+                Son datos de salud: solo los ve administración y queda registrado quién los consulta. Se guardan recién al confirmar.
+              </p>
+              {p.clinico.advertencias.map(a => <p key={a} style={{ fontSize: '.76rem', color: 'var(--amber)', marginBottom: '.4rem' }}>{a}</p>)}
+              <CamposClinicos valor={p.clinico} onCambio={c => onCambio({ clinico: c })} />
+            </div>
+          )}
+          {l.clinicoOmitido && !p.clinico && (
+            <p style={{ fontSize: '.76rem', color: 'var(--text3)', marginTop: '.7rem' }}>
+              Este archivo ya se había leído: sus datos clínicos no se muestran de nuevo. Se ven y se corrigen en la ficha clínica de la carpeta.
+            </p>
+          )}
           {p.estado === 'error' && <p style={{ fontSize: '.8rem', color: 'var(--red)', marginTop: '.6rem' }}>{p.mensaje}</p>}
           <div style={{ display: 'flex', gap: '.6rem', marginTop: '.9rem' }}>
             <button className="btn btn-secondary" style={{ flex: 1, minHeight: 44 }} onClick={onDescartar} disabled={bloqueada}>Descartar</button>

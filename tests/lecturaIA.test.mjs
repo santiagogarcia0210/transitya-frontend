@@ -67,6 +67,44 @@ describe('propuesta y confirmación', () => {
   });
 });
 
+describe('datos clínicos', () => {
+  const clinicoCud = () => ({
+    documento: 'cud', advertencias: [],
+    campos: {
+      diagnostico: { valor: 'Diagnóstico ficticio', confianza: 'alta' },
+      vencimientoCertificado: { valor: '10/10/2031', confianza: 'media' },
+      orientacionPrestaciones: { valor: ['centro_dia'], confianza: 'baja' },
+    },
+  });
+  test('la propuesta trae los datos clínicos listos para editar (fecha en ISO, lista de claves)', () => {
+    const p = L.propuestaDe(lectura({ clinico: clinicoCud() }));
+    assert.strictEqual(p.clinico.valores.vencimientoCertificado, '2031-10-10');
+    assert.deepStrictEqual(p.clinico.valores.orientacionPrestaciones, ['centro_dia']);
+    assert.strictEqual(p.clinico.confianzas.orientacionPrestaciones, 'baja');
+    assert.strictEqual(L.propuestaDe(lectura()).clinico, null);
+  });
+  test('al confirmar: solo campos con valor, fecha en dd/MM/yyyy, y "editado" solo si la persona cambió algo', () => {
+    const p = L.propuestaDe(lectura({ clinico: clinicoCud() }));
+    const sin = L.itemConfirmar(p).clinico;
+    assert.strictEqual(sin.documento, 'cud');
+    assert.strictEqual(sin.campos.vencimientoCertificado.valor, '10/10/2031');
+    assert.strictEqual(sin.campos.diagnostico.editado, false);
+    assert.ok(!('cie10' in sin.campos));
+    const ed = { ...p, clinico: { ...p.clinico, valores: { ...p.clinico.valores, diagnostico: 'Corregido', orientacionPrestaciones: ['centro_dia', 'hogar'] } } };
+    const con = L.itemConfirmar(ed).clinico;
+    assert.strictEqual(con.campos.diagnostico.editado, true);
+    assert.strictEqual(con.campos.orientacionPrestaciones.editado, true);
+    assert.strictEqual(con.campos.vencimientoCertificado.editado, false);
+  });
+  test('orden médica: los días por semana viajan como número', () => {
+    const e = L.clinicoEditable({ documento: 'orden_medica', advertencias: [], campos: { diasPorSemana: { valor: 5, confianza: 'alta' } } });
+    assert.strictEqual(L.clinicoParaConfirmar(e).campos.diasPorSemana.valor, 5);
+  });
+  test('sin datos clínicos no se manda el campo', () => {
+    assert.ok(!('clinico' in JSON.parse(JSON.stringify(L.itemConfirmar(L.propuestaDe(lectura()))))));
+  });
+});
+
 describe('confianza', () => {
   test('solo "baja" se marca como dudosa', () => {
     assert.strictEqual(L.esBaja('baja'), true);

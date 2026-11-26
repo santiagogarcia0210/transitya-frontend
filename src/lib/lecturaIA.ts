@@ -19,6 +19,86 @@ export interface LecturaOk {
   confianza: { tipo: Confianza; fechaEmision: Confianza; fechaVenc: Confianza; paciente: Confianza; emisor: Confianza };
   confianzaGeneral: Confianza; advertencias: string[];
   coincidePaciente: boolean | null; posiblePacienteEquivocado: boolean;
+  clinico?: ClinicoLeido | null;       // solo CUD/orden médica y solo si el usuario puede verlos
+  clinicoOmitido?: boolean;            // archivo ya leído antes: los datos clínicos no se conservan en la caché
+}
+
+/* ── Datos clínicos (solo CUD y orden médica; confidenciales) ─────────────── */
+
+export type DocClinico = 'cud' | 'orden_medica';
+export type ValorClinico = string | number | string[];
+export interface CampoClinico { valor: ValorClinico; confianza: Confianza }
+export interface ClinicoLeido { documento: DocClinico; campos: Record<string, CampoClinico>; advertencias: string[] }
+
+/** Modalidades del Nomenclador que la IA puede nombrar y que se sugieren (mismas claves que el servidor). */
+export const MODALIDADES: Record<string, string> = {
+  estimulacion_temprana: 'Estimulación temprana',
+  centro_dia: 'Centro de día',
+  centro_educativo_terapeutico: 'Centro educativo terapéutico',
+  escuela_especial: 'Escuela especial',
+  integracion_escolar: 'Apoyo a la integración escolar',
+  rehabilitacion_ambulatoria: 'Rehabilitación ambulatoria',
+  hogar: 'Hogar / residencia',
+  taller_protegido: 'Taller protegido / formación laboral',
+};
+
+export interface DefCampo { k: string; label: string; tipo: 'texto' | 'fecha' | 'lista' | 'numero'; largo?: boolean }
+export const CAMPOS_CLINICOS: Record<DocClinico, DefCampo[]> = {
+  cud: [
+    { k: 'diagnostico', label: 'Diagnóstico', tipo: 'texto', largo: true },
+    { k: 'cie10', label: 'Código CIE-10', tipo: 'texto' },
+    { k: 'tipoDiscapacidad', label: 'Tipo de discapacidad', tipo: 'texto' },
+    { k: 'nroCertificado', label: 'N° de certificado', tipo: 'texto' },
+    { k: 'vencimientoCertificado', label: 'Vencimiento del certificado', tipo: 'fecha' },
+    { k: 'orientacionTexto', label: 'Orientación prestacional (texto del CUD)', tipo: 'texto', largo: true },
+    { k: 'orientacionPrestaciones', label: 'Prestaciones recomendadas', tipo: 'lista' },
+  ],
+  orden_medica: [
+    { k: 'diagnostico', label: 'Diagnóstico', tipo: 'texto', largo: true },
+    { k: 'prestacionIndicada', label: 'Prestación y frecuencia indicadas', tipo: 'texto', largo: true },
+    { k: 'diasPorSemana', label: 'Días por semana', tipo: 'numero' },
+    { k: 'profesional', label: 'Profesional', tipo: 'texto' },
+  ],
+};
+export const TITULO_DOC_CLINICO: Record<DocClinico, string> = { cud: 'CUD', orden_medica: 'Orden médica' };
+
+/** Lo que se edita en pantalla: texto (las fechas en ISO) o lista de claves, más lo que leyó la IA para detectar ediciones. */
+export interface ClinicoEditable {
+  documento: DocClinico;
+  valores: Record<string, string | string[]>;
+  confianzas: Record<string, Confianza>;
+  original: Record<string, string | string[]>;
+  advertencias: string[];
+}
+
+const aEditable = (def: DefCampo, v: ValorClinico | undefined): string | string[] => {
+  if (def.tipo === 'lista') return Array.isArray(v) ? v.map(String) : [];
+  if (v === undefined || v === null) return '';
+  return def.tipo === 'fecha' ? dmyAIso(String(v)) : String(v);
+};
+const clave = (v: string | string[]) => (Array.isArray(v) ? [...v].sort().join('|') : v.trim());
+
+export function clinicoEditable(c: ClinicoLeido): ClinicoEditable {
+  const valores: Record<string, string | string[]> = {}, confianzas: Record<string, Confianza> = {};
+  for (const d of CAMPOS_CLINICOS[c.documento]) {
+    valores[d.k] = aEditable(d, c.campos[d.k]?.valor);
+    if (c.campos[d.k]) confianzas[d.k] = c.campos[d.k].confianza;
+  }
+  return { documento: c.documento, valores, confianzas, original: { ...valores }, advertencias: c.advertencias || [] };
+}
+
+/** Cuerpo `clinico` de confirmar-lectura: solo campos con valor; `editado` marca lo que cambió la persona. */
+export function clinicoParaConfirmar(e: ClinicoEditable | null) {
+  if (!e) return undefined;
+  const campos: Record<string, { valor: ValorClinico; confianza: Confianza; editado: boolean }> = {};
+  for (const d of CAMPOS_CLINICOS[e.documento]) {
+    const v = e.valores[d.k];
+    if (Array.isArray(v) ? v.length === 0 : !String(v ?? '').trim()) continue;
+    const valor: ValorClinico = d.tipo === 'lista' ? (v as string[]) : d.tipo === 'fecha' ? isoADmy(String(v)) : d.tipo === 'numero' ? Number(String(v).replace(/\D/g, '')) : String(v).trim();
+    if (d.tipo === 'fecha' && !valor) continue;
+    campos[d.k] = { valor, confianza: e.confianzas[d.k] || 'baja', editado: clave(v) !== clave(e.original[d.k] ?? '') };
+  }
+  return Object.keys(campos).length ? { documento: e.documento, campos } : undefined;
 }
 
 /** Un archivo que no se pudo leer (formato, tamaño, IA ocupada…). */
@@ -35,6 +115,7 @@ export interface Propuesta {
   notas: string;
   importe: string; concepto: string; validez: string;
   aceptarPacienteDistinto: boolean;
+  clinico: ClinicoEditable | null;
   estado: 'pendiente' | 'guardando' | 'guardada' | 'descartada' | 'error';
   mensaje: string;
 }
@@ -72,7 +153,7 @@ export function propuestaDe(l: LecturaOk): Propuesta {
     clave: l.hash, lectura: l, requisitoKey: l.requisitoKey || 'otro', nombre: l.tipoSugerido || '',
     fechaEmision: dmyAIso(l.fechaEmision), fechaVenc: dmyAIso(l.fechaVenc), notas: '',
     importe: p && p.importe !== null ? String(p.importe) : '', concepto: p?.concepto || '', validez: p?.validez || '',
-    aceptarPacienteDistinto: false,
+    aceptarPacienteDistinto: false, clinico: l.clinico ? clinicoEditable(l.clinico) : null,
     estado: l.yaCargado ? 'guardada' : 'pendiente', mensaje: l.yaCargado ? 'Este archivo ya está cargado en la carpeta.' : '',
   };
 }
@@ -95,6 +176,7 @@ export function itemConfirmar(p: Propuesta) {
     hash: p.clave, requisitoKey: p.requisitoKey, nombre: p.requisitoKey === 'otro' ? p.nombre.trim() : undefined,
     fechaEmision: isoADmy(p.fechaEmision), fechaVenc: isoADmy(p.fechaVenc), estadoTramite: 'CARGADO',
     notas: p.notas.trim(), datos, aceptarPacienteDistinto: p.aceptarPacienteDistinto,
+    clinico: clinicoParaConfirmar(p.clinico),
   };
 }
 

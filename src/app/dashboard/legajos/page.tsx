@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { IconCamera } from '@tabler/icons-react';
 import LecturaIA from '@/components/LecturaIA';
+import FichaClinica from '@/components/FichaClinica';
 import api from '@/lib/api';
 import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 import {
@@ -365,6 +366,8 @@ export default function LegajosPage() {
                     </div>
                   </>
                 )}
+
+                <FichaClinica key={detalle.beneficiario.id} beneficiarioId={detalle.beneficiario.id} />
 
                 <div style={{ marginTop: '1.25rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.4rem' }}>
