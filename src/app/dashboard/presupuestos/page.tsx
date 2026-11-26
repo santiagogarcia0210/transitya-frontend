@@ -137,7 +137,10 @@ function Detalle({ id, onCerrar, onCambio, onCorregir }: { id: string; onCerrar:
                 <button className="btn btn-secondary" style={{ minHeight: 44 }} disabled={ocupado} onClick={() => { if (window.confirm('¿Borrar este borrador?')) accion(async () => { await api.delete(`/api/presupuestos/${id}`); onCerrar(); }); }}>Borrar borrador</button>
               </>}
               {emitido && doc && <button className="btn btn-secondary" style={{ minHeight: 44 }} onClick={() => descargarPdf(doc)}><IconDownload size={16} /> PDF</button>}
-              {emitido && p.plantillaUsada && <button className="btn btn-secondary" style={{ minHeight: 44 }} disabled={ocupado} onClick={() => accion(() => bajarDocx(id, p.numeroTexto || ''))}><IconDownload size={16} /> .docx</button>}
+              {emitido && p.plantillaUsada && <>
+                <button className="btn btn-secondary" style={{ minHeight: 44 }} disabled={ocupado} onClick={() => accion(() => bajarDocx(id, p.numeroTexto || ''))}><IconDownload size={16} /> .docx</button>
+                <button className="btn btn-secondary" style={{ minHeight: 44 }} disabled={ocupado} onClick={() => accion(() => bajarDocx(id, p.numeroTexto || '', true))} title="El formulario trae dos copias iguales: una para cada parte">.docx con duplicado</button>
+              </>}
               {p.estado === 'EMITIDO' && <>
                 <button className="btn btn-secondary" style={{ minHeight: 44 }} disabled={ocupado} onClick={() => accion(async () => { await api.post(`/api/presupuestos/${id}/respuesta`, { estado: 'ACEPTADO' }); })}>Marcar aceptado</button>
                 <button className="btn btn-secondary" style={{ minHeight: 44 }} disabled={ocupado} onClick={() => accion(async () => { await api.post(`/api/presupuestos/${id}/respuesta`, { estado: 'RECHAZADO' }); })}>Marcar rechazado</button>
