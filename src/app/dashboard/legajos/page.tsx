@@ -1,6 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { IconCamera } from '@tabler/icons-react';
+import LecturaIA from '@/components/LecturaIA';
 import api from '@/lib/api';
 import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 import {
@@ -142,6 +144,7 @@ export default function LegajosPage() {
   const [form, setForm] = useState<FormDoc | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
+  const [leyendoIA, setLeyendoIA] = useState(false);
 
   const aplicarLista = (data: { carpetas?: Carpeta[]; hayRequisitos?: boolean }) => {
     setCarpetas(data.carpetas || []);
@@ -346,9 +349,14 @@ export default function LegajosPage() {
                   </div>
                 ) : (
                   <>
-                    <p style={{ fontSize: '.8rem', color: 'var(--text2)', marginBottom: '.25rem' }}>
-                      {detalle.resumen.OK} de {detalle.resumen.total} documentos al día
-                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap', marginBottom: '.25rem' }}>
+                      <p style={{ fontSize: '.8rem', color: 'var(--text2)' }}>
+                        {detalle.resumen.OK} de {detalle.resumen.total} documentos al día
+                      </p>
+                      <button className="btn btn-primary" style={{ minHeight: 44 }} onClick={() => setLeyendoIA(true)}>
+                        <IconCamera size={18} /> Cargar con fotos / leer con IA
+                      </button>
+                    </div>
                     <div>
                       {detalle.checklist.map(it => (
                         <FilaRequisito key={it.requisito.key} it={it}
@@ -383,6 +391,13 @@ export default function LegajosPage() {
             )}
           </div>
         </div>
+      )}
+
+      {leyendoIA && detalle && (
+        <LecturaIA beneficiarioId={detalle.beneficiario.id} beneficiarioNombre={detalle.beneficiario.nombre}
+          requisitos={(detalle.obra?.requisitos || []).filter(r => r.categoria === 'paciente')}
+          onCerrar={() => setLeyendoIA(false)}
+          onGuardado={() => Promise.all([cargarDetalle(detalle.beneficiario.id), cargar()])} />
       )}
 
       {form && <ModalDocumento form={form} setForm={setForm} onCerrar={() => setForm(null)} onGuardar={guardar} guardando={guardando} error={error} />}
