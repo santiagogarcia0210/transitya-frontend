@@ -1,9 +1,10 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import axios from 'axios';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
 import { useRequireAdmin } from '@/hooks/useRequireAdmin';
+import ObraSocialSelect from '@/components/ObraSocialSelect';
+import { limpiarPayloadBeneficiario, mensajeGuardado } from '@/lib/beneficiarioForm';
 
 type Tab = 'alta' | 'baja' | 'ver' | 'fs';
 const DIAS_SEM = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
@@ -267,7 +268,7 @@ export default function RegistroPage() {
     }
     setSaving(true); setMsgAlta(null);
     try {
-      const payload = {
+      const payload = limpiarPayloadBeneficiario({
         ...form,
         'APELLIDO Y NOMBRE': form.apellidoYNombre.trim(),
         NOMBRE: form.apellidoYNombre.trim(),
@@ -276,6 +277,8 @@ export default function RegistroPage() {
         LOCALIDAD: form.localidad.trim(),
         NROCONTACTO: form.nroContacto.trim(),
         'OBRA SOCIAL': form.obraSocial.trim(),
+        'N° AFILIADO': form.nroAfiliado.trim(),   // antes no se guardaba: las planillas lo leen de acá
+        nroAfiliado: form.nroAfiliado.trim(),
         PRESTADOR: form.prestador.trim(),
         CODIGOPRESTADOR: form.codigoPrestador.trim(),
         KMIDAVUELTA: Number(form.kmIdaVuelta) || 0,
@@ -286,7 +289,7 @@ export default function RegistroPage() {
         HORARIO_TURNO: form.horarioTurno.trim(),
         OBSERVACIONES: form.observaciones.trim(),
         activo: true,
-      };
+      });
       if (form.id) {
         await api.put(`/api/beneficiarios/${form.id}`, payload);
         setMsgAlta({ text: '✅ Beneficiario actualizado.', ok: true });
@@ -298,8 +301,7 @@ export default function RegistroPage() {
       }
       cargar();
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.mensaje : undefined;
-      setMsgAlta({ text: msg || 'Error al guardar. Intentá de nuevo.', ok: false });
+      setMsgAlta({ text: mensajeGuardado(err), ok: false });
     }
     setSaving(false);
   };
@@ -325,7 +327,7 @@ export default function RegistroPage() {
       setConfirmBaja(null); setBajaNota('');
       setBajaResult(r => r.filter(b => b.id !== confirmBaja.id));
       cargar();
-    } catch { setMsgBaja({ text: 'Error al dar de baja.', ok: false }); }
+    } catch (err: unknown) { setMsgBaja({ text: mensajeGuardado(err, 'dar de baja'), ok: false }); }
     setSavingBaja(false);
   };
 
@@ -347,7 +349,9 @@ export default function RegistroPage() {
           <div><label style={L}>Localidad</label><input className="input" value={form.localidad} onChange={setF('localidad')} /></div>
         </div>
         <div className="form-grid form-grid-2">
-          <div><label style={L}>Obra Social</label><input className="input" value={form.obraSocial} onChange={setF('obraSocial')} /></div>
+          <div><label style={L}>Obra Social</label>
+            <ObraSocialSelect value={form.obraSocial} existentes={lista.map(b => b.obraSocial)}
+              onChange={v => setForm(f => ({ ...f, obraSocial: v }))} /></div>
           <div><label style={L}>N° Contacto</label><input className="input" value={form.nroContacto} onChange={setF('nroContacto')} /></div>
         </div>
         <div className="form-grid form-grid-2">

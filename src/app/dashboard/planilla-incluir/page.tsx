@@ -1,23 +1,14 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import api from '@/lib/api';
-import { serializarFirestore, toArray } from '@/lib/utils';
+import { leerPlanilla, textoAvisoSinObraSocial, fichaHref, textoAfiliadoImpreso, mensajeGuardado, type FilaPlanilla, type SinObraSocial } from '@/lib/beneficiarioForm';
 import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
 import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-interface Beneficiario { id: string; nombre: string; nroAfiliado: string; }
-
-function normB(b: Record<string,unknown>): Beneficiario {
-  return {
-    id:          String(b.id          || ''),
-    nombre:      String(b.nombre      || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
-    nroAfiliado: String(b.nroAfiliado || b['N° AFILIADO'] || b.nro_afiliado || ''),
-  };
-}
 
 /* ── Genera array de días igual al GAS ─────────────────────────────────── */
 function diasDelMes(mes: number, anio: number) {
@@ -273,7 +264,9 @@ export default function PlanillaIncluirPage() {
   const hoy = new Date();
   const [mes,          setMes]          = useState(hoy.getMonth() + 1);
   const [anio,         setAnio]         = useState(hoy.getFullYear());
-  const [beneficiarios,setBeneficiarios]= useState<Beneficiario[]>([]);
+  const [beneficiarios,setBeneficiarios]= useState<FilaPlanilla[]>([]);
+  const [sinOS,        setSinOS]        = useState<SinObraSocial[]>([]);
+  const [errCarga,     setErrCarga]     = useState('');
   const [loading,      setLoading]      = useState(false);
   const [resumen,      setResumen]      = useState('');
 
@@ -282,27 +275,21 @@ export default function PlanillaIncluirPage() {
       router.replace('/dashboard');
   }, [tipo, tipoLoading, router]);
 
+  // Una sola fuente: /api/planillas/incluir (pacientes ACTIVOS de Incluir de registro y BENEFICIARIOS). Sin
+  // plan B silencioso: si la carga falla se avisa, para no mostrar una planilla incompleta como si estuviera bien.
   const cargar = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setErrCarga('');
     try {
-      let data: Beneficiario[] = [];
-      try {
-        const r = await api.get(`/api/planillas/incluir?mes=${mes}&anio=${anio}`);
-        const d = serializarFirestore(r.data);
-        const arr = toArray(d?.planillas ?? d?.beneficiarios ?? d);
-        data = arr.filter((b: Record<string,unknown>) =>
-          (b.nroAfiliado || b['N° AFILIADO'] || b.nro_afiliado || b.beneficiario)
-        ).map(normB);
-      } catch { /* fallback */ }
-      if (!data.length) {
-        const r = await api.get('/api/beneficiarios');
-        data = toArray(r.data).map(serializarFirestore)
-          .filter((b: Record<string,unknown>) => b.nroAfiliado || b['N° AFILIADO'])
-          .map(normB);
-      }
-      setBeneficiarios(data);
-      setResumen(`${MESES[mes-1]} ${anio} — ${data.length} planillas`);
-    } catch { /* silent */ }
+      const r = await api.get(`/api/planillas/incluir?mes=${mes}&anio=${anio}`);
+      const { filas, sinObraSocial } = leerPlanilla(r.data);
+      setBeneficiarios(filas);
+      setSinOS(sinObraSocial);
+      const sinN = filas.filter(f => f.faltaAfiliado).length;
+      setResumen(`${MESES[mes-1]} ${anio} — ${filas.length} planillas${sinN ? ` (${sinN} sin N° de afiliado)` : ''}`);
+    } catch (e) {
+      setBeneficiarios([]); setSinOS([]); setResumen('');
+      setErrCarga(mensajeGuardado(e, 'cargar la planilla'));
+    }
     setLoading(false);
   }, [mes, anio]);
 
@@ -401,19 +388,43 @@ export default function PlanillaIncluirPage() {
         </div>
       </div>
 
+      {errCarga && (
+        <div className="no-print card" role="alert" style={{ padding:'.8rem 1rem', marginBottom:'1rem', borderColor:'var(--red)', color:'var(--red)', fontSize:'.85rem' }}>
+          {errCarga} <button className="btn btn-secondary" style={{ marginLeft:'.6rem' }} onClick={cargar}>Reintentar</button>
+        </div>
+      )}
+
+      {sinOS.length > 0 && (
+        <div className="no-print card" role="status" style={{ padding:'.8rem 1rem', marginBottom:'1rem', fontSize:'.85rem', borderColor:'var(--amber, #d97706)' }}>
+          <strong>⚠ {textoAvisoSinObraSocial(sinOS.length)}</strong>
+          <span style={{ color:'var(--text3)' }}> — no entran a la planilla hasta que tengan obra social. </span>
+          <span style={{ display:'inline-flex', flexWrap:'wrap', gap:'.4rem .9rem' }}>
+            {sinOS.map(p => <Link key={p.id} href={fichaHref(p.id)} style={{ textDecoration:'underline' }}>{p.nombre}</Link>)}
+          </span>
+        </div>
+      )}
+
       {loading ? (
         <div style={{ display:'flex', alignItems:'center', gap:'.75rem', color:'var(--text3)', padding:'2rem' }}>
           <span className="spinner"/> Cargando planillas…
         </div>
-      ) : beneficiarios.length === 0 ? (
+      ) : errCarga ? null : beneficiarios.length === 0 ? (
         <div className="empty-state no-print">
           <div className="empty-icon">📝</div>
-          <p>No hay afiliados con número de beneficiario para {MESES[mes-1]} {anio}</p>
+          <p>No hay pacientes de Incluir Salud activos para {MESES[mes-1]} {anio}</p>
         </div>
       ) : (
         <div className="dj-pages">
           {beneficiarios.map(b => (
-            <PlanillaIncluir key={b.id} nombre={b.nombre} nroAfiliado={b.nroAfiliado} mes={mes} anio={anio} />
+            <Fragment key={b.id}>
+              {/* Marca solo en pantalla (no-print): la hoja sale con el N° en blanco para completarlo a mano. */}
+              {b.faltaAfiliado && (
+                <div className="no-print" role="status" style={{ width:'210mm', maxWidth:'100%', margin:'0 0 .35rem', padding:'.4rem .7rem', fontSize:'.8rem', background:'rgba(217,119,6,.12)', color:'var(--amber, #b45309)', borderRadius:6 }}>
+                  ⚠ falta N° afiliado de {b.nombre} — <Link href={fichaHref(b.id)} style={{ textDecoration:'underline' }}>cargarlo en la ficha</Link>
+                </div>
+              )}
+              <PlanillaIncluir nombre={b.nombre} nroAfiliado={textoAfiliadoImpreso(b.nroAfiliado)} mes={mes} anio={anio} />
+            </Fragment>
           ))}
         </div>
       )}

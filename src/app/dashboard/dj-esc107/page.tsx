@@ -1,28 +1,16 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import api from '@/lib/api';
-import { serializarFirestore, toArray } from '@/lib/utils';
+import { leerPlanilla, textoAvisoSinObraSocial, fichaHref, textoAfiliadoImpreso, mensajeGuardado, type FilaPlanilla, type SinObraSocial } from '@/lib/beneficiarioForm';
 import { useEmpresaTipo } from '@/hooks/useEmpresaTipo';
 import { useRequireAdmin } from '@/hooks/useRequireAdmin';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-interface Beneficiario {
-  id: string; nombre: string; nroAfiliado: string;
-  dni?: string; chofer?: string;
-}
-
-function normB(b: Record<string,unknown>): Beneficiario {
-  return {
-    id:          String(b.id          || ''),
-    nombre:      String(b.nombre      || b.apellidoNombre || b['APELLIDO Y NOMBRE'] || b.NOMBRE || ''),
-    nroAfiliado: String(b.nroAfiliado || b['N° AFILIADO'] || b.nro_afiliado || b.beneficiario || ''),
-    dni:         String(b.dni         || b.DNI || ''),
-    chofer:      String(b.chofer      || b.CHOFER || ''),
-  };
-}
+type Beneficiario = FilaPlanilla;
 
 /* ── Planilla DJ A4 — idéntica al GAS renderDjPage ─────────────────────── */
 function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }) {
@@ -89,7 +77,7 @@ function DjPage({ b, mes, anio }: { b: Beneficiario; mes: number; anio: number }
       <div style={{ ...INDENT, flexShrink: 0, display: 'flex', alignItems: 'stretch', fontSize: '11pt' }}>
         <span style={{ minWidth: '130pt', display: 'flex', alignItems: 'center' }}>BENEFICIO Nro</span>
         <span style={{ border: '1px solid #000', padding: '5pt 8pt', minWidth: '185pt', fontWeight: 'bold' }}>
-          {b.nroAfiliado}
+          {textoAfiliadoImpreso(b.nroAfiliado)}
         </span>
         <span style={{ flex: 1 }} />
       </div>
@@ -180,32 +168,28 @@ export default function DJEsc107Page() {
   const [busqueda,     setBusqueda]     = useState('');
   const [seleccionado, setSeleccionado] = useState<Beneficiario | null>(null);
   const [modoTodos,    setModoTodos]    = useState(false);
+  const [sinOS,        setSinOS]        = useState<SinObraSocial[]>([]);
+  const [errCarga,     setErrCarga]     = useState('');
 
   useEffect(() => {
     if (!tipoLoading && tipo !== null && tipo !== 'transporte_escolar' && tipo !== 'transporte_especial')
       router.replace('/dashboard');
   }, [tipo, tipoLoading, router]);
 
+  // Una sola fuente: /api/planillas/dj107 (pacientes ACTIVOS de Incluir de registro y BENEFICIARIOS), con o sin
+  // N° de afiliado. Sin plan B silencioso: si falla se avisa.
   const cargar = async () => {
-    setLoading(true);
+    setLoading(true); setErrCarga('');
     try {
-      let data: Beneficiario[] = [];
-      try {
-        const r = await api.get(`/api/planillas/dj107?mes=${mes}&anio=${anio}`);
-        const d = serializarFirestore(r.data);
-        const arr = toArray(d?.planillas ?? d?.beneficiarios ?? d);
-        data = arr.filter((b: Record<string,unknown>) =>
-          (b.nroAfiliado || b['N° AFILIADO'] || b.beneficiario)
-        ).map(normB);
-      } catch { /* fallback */ }
-      if (!data.length) {
-        const r = await api.get('/api/beneficiarios');
-        data = toArray(r.data).map(serializarFirestore)
-          .filter((b: Record<string,unknown>) => b.nroAfiliado || b['N° AFILIADO'])
-          .map(normB);
-      }
-      setBeneficiarios(data);
-      setResumen(`${MESES[mes-1]} ${anio} — ${data.length} planillas`);
+      const r = await api.get(`/api/planillas/dj107?mes=${mes}&anio=${anio}`);
+      const { filas, sinObraSocial } = leerPlanilla(r.data);
+      setBeneficiarios(filas);
+      setSinOS(sinObraSocial);
+      const sinN = filas.filter(f => f.faltaAfiliado).length;
+      setResumen(`${MESES[mes-1]} ${anio} — ${filas.length} planillas${sinN ? ` (${sinN} sin N° de afiliado)` : ''}`);
+    } catch (e) {
+      setBeneficiarios([]); setSinOS([]); setResumen('');
+      setErrCarga(mensajeGuardado(e, 'cargar la planilla'));
     } finally { setLoading(false); }
   };
 
@@ -325,6 +309,22 @@ export default function DJEsc107Page() {
         </div>
       </div>
 
+      {errCarga && (
+        <div className="no-print card" role="alert" style={{ padding:'.8rem 1rem', marginBottom:'1rem', borderColor:'var(--red)', color:'var(--red)', fontSize:'.85rem' }}>
+          {errCarga} <button className="btn btn-secondary" style={{ marginLeft:'.6rem' }} onClick={cargar}>Reintentar</button>
+        </div>
+      )}
+
+      {sinOS.length > 0 && (
+        <div className="no-print card" role="status" style={{ padding:'.8rem 1rem', marginBottom:'1rem', fontSize:'.85rem', borderColor:'var(--amber, #d97706)' }}>
+          <strong>⚠ {textoAvisoSinObraSocial(sinOS.length)}</strong>
+          <span style={{ color:'var(--text3)' }}> — no entran a la planilla hasta que tengan obra social. </span>
+          <span style={{ display:'inline-flex', flexWrap:'wrap', gap:'.4rem .9rem' }}>
+            {sinOS.map(p => <Link key={p.id} href={fichaHref(p.id)} style={{ textDecoration:'underline' }}>{p.nombre}</Link>)}
+          </span>
+        </div>
+      )}
+
       <div className="no-print" style={{ display:'grid', gridTemplateColumns:'300px 1fr', gap:'1.25rem' }}>
         {/* Lista beneficiarios */}
         <div>
@@ -334,7 +334,7 @@ export default function DJEsc107Page() {
             {loading ? (
               <div style={{ padding:'2rem', textAlign:'center', color:'var(--text3)' }}><span className="spinner"/></div>
             ) : filtrados.length === 0 ? (
-              <div className="empty-state"><p>Sin beneficiarios con afiliado</p></div>
+              <div className="empty-state"><p>{errCarga ? 'No se pudo cargar la lista' : 'Sin pacientes de Incluir Salud activos'}</p></div>
             ) : filtrados.map(b => (
               <div key={b.id} onClick={() => { setSeleccionado(b); setModoTodos(false); }}
                 style={{
@@ -346,14 +346,16 @@ export default function DJEsc107Page() {
                 }}>
                 <p style={{ fontSize:'.85rem', fontWeight:500, color:'var(--text)' }}>{b.nombre}</p>
                 <p style={{ fontSize:'.75rem', color:'var(--text3)' }}>
-                  {b.nroAfiliado && `Afil: ${b.nroAfiliado}`}
+                  {b.faltaAfiliado
+                    ? <span style={{ color:'var(--amber, #b45309)', fontWeight:600 }}>⚠ falta N° afiliado</span>
+                    : `Afil: ${b.nroAfiliado}`}
                   {b.dni && ` · DNI: ${b.dni}`}
                 </p>
               </div>
             ))}
           </div>
           <p style={{ fontSize:'.75rem', color:'var(--text3)', marginTop:'.5rem', textAlign:'center' }}>
-            {filtrados.length} de {beneficiarios.length} beneficiarios
+            {filtrados.length} de {beneficiarios.length} pacientes
           </p>
         </div>
 
@@ -365,7 +367,14 @@ export default function DJEsc107Page() {
               <p>Seleccioná un beneficiario para ver el DJ</p>
             </div>
           ) : (
-            <DjPage b={seleccionado} mes={mes} anio={anio} />
+            <>
+              {seleccionado.faltaAfiliado && (
+                <p role="status" style={{ marginBottom:'.5rem', fontSize:'.82rem', color:'var(--amber, #b45309)' }}>
+                  ⚠ falta N° afiliado — <Link href={fichaHref(seleccionado.id)} style={{ textDecoration:'underline' }}>cargarlo en la ficha</Link>. La hoja se imprime con ese campo en blanco.
+                </p>
+              )}
+              <DjPage b={seleccionado} mes={mes} anio={anio} />
+            </>
           )}
         </div>
       </div>
