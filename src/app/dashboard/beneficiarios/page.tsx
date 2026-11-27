@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
-import axios from 'axios';
 import api from '@/lib/api';
 import { serializarFirestore, toArray } from '@/lib/utils';
+import ObraSocialSelect from '@/components/ObraSocialSelect';
+import { limpiarPayloadBeneficiario, mensajeGuardado } from '@/lib/beneficiarioForm';
 
 type TabReg = 'alta' | 'baja' | 'ver' | 'fs';
 
@@ -69,6 +70,40 @@ const EMPTY_FORM: FormState = {
   chofer:'',
 };
 
+/** El formulario cargado con los datos de un paciente existente. */
+const formDe = (b: Beneficiario): FormState => ({
+  id: b.id, nombre: b.nombre, apellido: b.apellido, dni: b.dni,
+  domicilio: b.domicilio, localidad: b.localidad, barrio: b.barrio, zona: b.zona,
+  telefono: b.telefono, telefonoEmerg: b.telefonoEmerg, contactoEmerg: b.contactoEmerg,
+  obraSocial: b.obraSocial, nroAfiliado: b.nroAfiliado,
+  horarioTurno: b.horarioTurno, condicion: b.condicion, observaciones: b.observaciones,
+  chofer: b.chofer,
+});
+
+/** Lo que se guarda, igual para el alta y la edición (antes la edición mandaba menos campos y el N° de afiliado
+ *  y la obra social quedaban en claves que las planillas no leen). Limpio: sin id ni campos internos ni undefined. */
+const armarPayload = (form: FormState) => limpiarPayloadBeneficiario({
+  ...form,
+  'APELLIDO Y NOMBRE': `${form.apellido} ${form.nombre}`.trim(),
+  NOMBRE: form.nombre.trim(),
+  DNI: form.dni.trim(),
+  LOCALIDAD: form.localidad.trim(),
+  DOMICILIO: form.domicilio.trim(),
+  BARRIO: form.barrio.trim(),
+  ZONA: form.zona.trim(),
+  TELEFONO: form.telefono.trim(),
+  TEL_EMERGENCIA: form.telefonoEmerg.trim(),
+  CONTACTO_EMERGENCIA: form.contactoEmerg.trim(),
+  'OBRA SOCIAL': form.obraSocial.trim(),
+  'N° AFILIADO': form.nroAfiliado.trim(),
+  nroAfiliado: form.nroAfiliado.trim(),
+  HORARIO_TURNO: form.horarioTurno.trim(),
+  CONDICION_ESPECIAL: form.condicion.trim(),
+  OBSERVACIONES: form.observaciones.trim(),
+  CHOFER: form.chofer.trim(),
+  activo: true,
+});
+
 export default function BeneficiariosPage() {
   const [tab,            setTab]            = useState<TabReg>('alta');
   const [lista,          setLista]          = useState<Beneficiario[]>([]);
@@ -112,6 +147,13 @@ export default function BeneficiariosPage() {
         .filter(b => b.activo !== false)
         .sort((a, b) => fullName(a).localeCompare(fullName(b), 'es'));
       setLista(raw);
+      // Link desde las planillas ("N pacientes sin obra social: revisar"): abre la ficha de ese paciente.
+      const editarId = new URLSearchParams(window.location.search).get('editar');
+      if (editarId) {
+        const b = raw.find(x => x.id === editarId);
+        if (b) { setForm(formDe(b)); setEditando(b); setTab('alta'); }
+        else setMsgAlta({ text: 'No se encontró al paciente del link (¿ya se dio de baja?).', ok: false });
+      }
       const nombresChof = toArray(rChof.data)
         .map((u: Record<string,unknown>) => String(u.nombre || u.NOMBRE || ''))
         .filter(Boolean).sort();
@@ -140,26 +182,7 @@ export default function BeneficiariosPage() {
     if (!form.dni) { setMsgAlta({ text: 'DNI es obligatorio.', ok: false }); return; }
     setSaving(true); setMsgAlta(null);
     try {
-      const payload = {
-        ...form,
-        'APELLIDO Y NOMBRE': `${form.apellido} ${form.nombre}`.trim(),
-        NOMBRE: form.nombre.trim(),
-        DNI: form.dni.trim(),
-        LOCALIDAD: form.localidad.trim(),
-        DOMICILIO: form.domicilio.trim(),
-        BARRIO: form.barrio.trim(),
-        ZONA: form.zona.trim(),
-        TELEFONO: form.telefono.trim(),
-        TEL_EMERGENCIA: form.telefonoEmerg.trim(),
-        CONTACTO_EMERGENCIA: form.contactoEmerg.trim(),
-        'OBRA SOCIAL': form.obraSocial.trim(),
-        'N° AFILIADO': form.nroAfiliado.trim(),
-        HORARIO_TURNO: form.horarioTurno.trim(),
-        CONDICION_ESPECIAL: form.condicion.trim(),
-        OBSERVACIONES: form.observaciones.trim(),
-        CHOFER: form.chofer.trim(),
-        activo: true,
-      };
+      const payload = armarPayload(form);
       if (form.id) {
         await api.put(`/api/beneficiarios/${form.id}`, payload);
         setMsgAlta({ text: '✅ Beneficiario actualizado.', ok: true });
@@ -170,8 +193,7 @@ export default function BeneficiariosPage() {
       }
       cargar();
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.mensaje : undefined;
-      setMsgAlta({ text: msg || 'Error al guardar. Intentá de nuevo.', ok: false });
+      setMsgAlta({ text: mensajeGuardado(err), ok: false });
     }
     setSaving(false);
   };
@@ -202,8 +224,7 @@ export default function BeneficiariosPage() {
       setBajaResult(r => r.filter(b => b.id !== confirmBaja.id));
       cargar();
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.mensaje : undefined;
-      setMsgBaja({ text: msg || 'Error al dar de baja.', ok: false });
+      setMsgBaja({ text: mensajeGuardado(err, 'dar de baja'), ok: false });
     }
     setSavingBaja(false);
   };
@@ -223,14 +244,7 @@ export default function BeneficiariosPage() {
 
   /* ─── Tab Ver: edición inline ─── */
   const abrirEdicion = (b: Beneficiario) => {
-    setForm({
-      id: b.id, nombre: b.nombre, apellido: b.apellido, dni: b.dni,
-      domicilio: b.domicilio, localidad: b.localidad, barrio: b.barrio, zona: b.zona,
-      telefono: b.telefono, telefonoEmerg: b.telefonoEmerg, contactoEmerg: b.contactoEmerg,
-      obraSocial: b.obraSocial, nroAfiliado: b.nroAfiliado,
-      horarioTurno: b.horarioTurno, condicion: b.condicion, observaciones: b.observaciones,
-      chofer: b.chofer,
-    });
+    setForm(formDe(b));
     setEditando(b); setMsgEdit(null);
     setTab('alta');
   };
@@ -239,22 +253,12 @@ export default function BeneficiariosPage() {
     if (!editando) return;
     setSavingEdit(true); setMsgEdit(null);
     try {
-      const payload = {
-        ...form,
-        'APELLIDO Y NOMBRE': `${form.apellido} ${form.nombre}`.trim(),
-        NOMBRE: form.nombre.trim(),
-        DNI: form.dni.trim(),
-        LOCALIDAD: form.localidad.trim(),
-        DOMICILIO: form.domicilio.trim(),
-        CHOFER: form.chofer.trim(),
-        activo: true,
-      };
+      const payload = armarPayload(form);
       await api.put(`/api/beneficiarios/${editando.id}`, payload);
       setMsgEdit({ text: '✅ Actualizado.', ok: true });
       setEditando(null); setForm(EMPTY_FORM); cargar();
     } catch (err: unknown) {
-      const msg = axios.isAxiosError(err) ? err.response?.data?.mensaje : undefined;
-      setMsgEdit({ text: msg || 'Error al actualizar.', ok: false });
+      setMsgEdit({ text: mensajeGuardado(err, 'actualizar'), ok: false });
     }
     setSavingEdit(false);
   };
@@ -286,7 +290,8 @@ export default function BeneficiariosPage() {
         </div>
         <div className="form-grid form-grid-2">
           <div><label style={L}>Obra social</label>
-            <input className="input" placeholder="IOMA, OSDE…" value={form.obraSocial} onChange={setF('obraSocial')} /></div>
+            <ObraSocialSelect value={form.obraSocial} existentes={lista.map(b => b.obraSocial)}
+              onChange={v => setForm(f => ({ ...f, obraSocial: v }))} /></div>
           <div><label style={L}>Horario de turno médico</label>
             <input className="input" placeholder="08:00" value={form.horarioTurno} onChange={setF('horarioTurno')} /></div>
         </div>
