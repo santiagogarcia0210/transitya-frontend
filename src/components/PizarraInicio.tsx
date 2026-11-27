@@ -17,7 +17,8 @@ interface DiaKm { fecha: string; diaSemana: string; esAyer?: boolean; faltan: Fa
 interface ColKm extends Base { sinChoferes: boolean; hoy: DiaKm | null; anterior: DiaKm | null; }
 
 interface ItemTarea { tareaId: string; titulo: string; obraSocial?: string; periodo: string; fecha: string; estado: string; diffDias: number | null; nivel: Nivel; }
-interface ColTareas extends Base { configuradas: number; items: ItemTarea[]; total: number; vencidas: number; proximas: number; }
+interface ItemPresupuesto { id: string; numeroTexto: string; beneficiario: string; obraSocial: string; fechaEmision: string; diasSinRespuesta: number; nivel: Nivel; }
+interface ColTareas extends Base { configuradas: number; items: ItemTarea[]; total: number; vencidas: number; proximas: number; presupuestos?: { dias: number; total: number; items: ItemPresupuesto[] }; }
 
 interface ItemVenc { id: string; descripcion: string; persona: string; tipo: string; fechaVenc: string; estado: string; diffDias: number; nivel: Nivel; }
 interface ItemPaciente {
@@ -296,6 +297,7 @@ export default function PizarraInicio() {
 
   // Lo más urgente arriba de cada lista; en Documentación, además, primero la sección que tiene algo vencido.
   const itemsTareas = urgentesPrimero(tareas.items);
+  const presup = tareas.presupuestos ?? { dias: 7, total: 0, items: [] };   // presupuestos emitidos sin respuesta (sin datos clínicos)
   const itemsVenc = urgentesPrimero(docs.vencimientos.items);
   const itemsPac = urgentesPrimero(docs.pacientes.items);
   const itemsMail = urgentesPrimero(correo.items ?? []);
@@ -410,9 +412,12 @@ export default function PizarraInicio() {
         </Mosaico>
 
         {/* 2 · Administración (agenda) */}
-        <Mosaico clase="adm" titulo="Administración" icono={<IconClipboardCheck size={18} stroke={2} />} col={tareas} hayAlgo={itemsTareas.length > 0}
+        <Mosaico clase="adm" titulo="Administración" icono={<IconClipboardCheck size={18} stroke={2} />} col={tareas} hayAlgo={itemsTareas.length > 0 || presup.items.length > 0}
           vacio={tareas.configuradas === 0 ? 'Todavía no hay tareas en la agenda.' : 'Todo al día'}
-          pie={<Link className="pz-link" href="/dashboard/panel-admin">Abrir Panel administrativo</Link>}>
+          pie={<>
+            <Link className="pz-link" href="/dashboard/panel-admin">Abrir Panel administrativo</Link>
+            {presup.total > 0 && <Link className="pz-link" href="/dashboard/presupuestos">Presupuestos</Link>}
+          </>}>
           <ul className="pz-lista">
             {itemsTareas.map(t => {
               const k = `${t.tareaId}_${t.periodo}`;
@@ -431,6 +436,23 @@ export default function PizarraInicio() {
             })}
           </ul>
           {tareas.total > itemsTareas.length && <p className="pz-mas">y {tareas.total - itemsTareas.length} más en el panel</p>}
+          {presup.items.length > 0 && (
+            <>
+              <p className="pz-sub">Presupuestos sin respuesta (más de {presup.dias} días)</p>
+              <ul className="pz-lista">
+                {presup.items.map(p => (
+                  <li className="pz-item pz-item--media" key={p.id}>
+                    <div className="pz-item-main">
+                      <p className="pz-item-titulo">Presupuesto N° {p.numeroTexto}{p.beneficiario ? ` · ${p.beneficiario}` : ''}</p>
+                      <p className="pz-item-sub">{p.obraSocial}{p.obraSocial ? ' · ' : ''}emitido {p.fechaEmision} · hace {p.diasSinRespuesta} días</p>
+                    </div>
+                    <span className="pz-etiqueta pz-etiqueta--media">Sin respuesta</span>
+                  </li>
+                ))}
+              </ul>
+              {presup.total > presup.items.length && <p className="pz-mas">y {presup.total - presup.items.length} más</p>}
+            </>
+          )}
         </Mosaico>
 
         {/* 3 · Documentación */}
